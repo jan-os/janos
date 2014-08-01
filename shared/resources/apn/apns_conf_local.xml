@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+<!-- use empty string to specify no proxy or port -->
+<!-- This version must agree with that in apps/common/res/apns.xml -->
+<apns version="7">
+
+  <!-- Test Network -->
+  <apn carrier="Test Network"
+      mcc="001"
+      mnc="01"
+      apn="internet"
+      user="user"
+      password="password"
+      proxy="127.0.0.1"
+      port="8080"
+      mmsc="http://127.0.0.1"
+      mmsproxy="127.0.0.1"
+      mmsport="8080"
+      authtype="0"
+      type="default,supl,mms,dun,ims"
+  />
+
+  <!-- APNs used for bearer tests -->
+  <!-- Test network with no bearer (compatible with all network types) -->
+  <apn carrier="NoBearer"
+      mcc="001"
+      mnc="02"
+      apn="nobearer"
+      user="user"
+      password="password"
+      proxy="127.0.0.1"
+      port="8080"
+      mmsc="http://127.0.0.1"
+      mmsproxy="127.0.0.1"
+      mmsport="8080"
+      authtype="0"
+      type="default,supl,mms,dun,ims"
+  />
+
+  <!-- Test network with an EVDO_0 bearer -->
+  <apn carrier="Evdo0Bearer"
+      mcc="001"
+      mnc="02"
+      apn="evdo0bearer"
+      user="user"
+      password="password"
+      proxy="127.0.0.1"
+      port="8080"
+      mmsc="http://127.0.0.1"
+      mmsproxy="127.0.0.1"
+      mmsport="8080"
+      authtype="0"
+      type="default,supl,mms,dun,ims"
+      bearer="7"
+  />
+
+  <!-- Test network with a 0 bearer (compatible with all network types) -->
+  <apn carrier="ZeroBearer"
+      mcc="001"
+      mnc="02"
+      apn="zerobearer"
+      user="user"
+      password="password"
+      proxy="127.0.0.1"
+      port="8080"
+      mmsc="http://127.0.0.1"
+      mmsproxy="127.0.0.1"
+      mmsport="8080"
+      authtype="0"
+      type="default,supl,mms,dun,ims"
+      bearer="0"
+  />
+
+  <!-- Default APN for undefined types -->
+  <apn carrier="No type test"
+      mcc="001"
+      mnc="03"
+      apn="internet"
+      user="user"
+      password="password"
+      proxy="127.0.0.1"
+      port="8080"
+      mmsc="http://127.0.0.1"
+      mmsproxy="127.0.0.1"
+      mmsport="8080"
+      authtype="0"
+  />
+
+  <!-- /Test Networks -->
+
+  <apn carrier="SpeakOut"
+      mcc="302"
+      mnc="720"
+      apn="goam.com"
+      user="wapuser1"
+      password="wap"
+      proxy="10.128.1.69"
+      port="80"
+      mmsc="http://mms.gprs.rogers.com"
+      mmsproxy="10.128.1.69"
+      mmsport="80"
+      type="default,mms"
+  />
+
+  <!-- override carrier names until they get updated in the upstream database -->
+
+  <apn carrier="VM WAP"
+      mcc="208"
+      mnc="01"
+      name="Virgin Mobile"
+  />
+
+  <apn carrier="VM MMS"
+      mcc="208"
+      mnc="01"
+      name="Virgin Mobile MMS"
+  />
+
+  <apn carrier="亞太電信(APBW) (Internet)"
+      mcc="466"
+      mnc="05"
+      apn="aptnet"
+      mmsproxy="210.200.66.196"
+      mmsport="80"
+      user="aptwap@nsip.qma.com.tw"
+      password="aptwap"
+      authtype="2"
+      type="default"
+  />
+
+  <apn carrier="亞太電信(APBW) (WAP)"
+      mcc="466"
+      mnc="05"
+      apn="aptwap"
+      mmsproxy="210.200.66.196"
+      mmsport="80"
+      user="aptwap@nsip.qma.com.tw"
+      password="aptwap"
+      authtype="2"
+      type="default"
+  />
+
+  <apn carrier="亞太電信(APBW) (MMS)"
+      mcc="466"
+      mnc="05"
+      apn="aptmms"
+      mmsc="http://mms.aptg.com.tw"
+      mmsproxy="210.200.66.196"
+      mmsport="80"
+      user="aptwap@nsip.qma.com.tw"
+      password="aptwap"
+      type="mms"
+  />
+
+  <apn carrier="Conexion Compartida"
+      mcc="214"
+      mnc="07"
+      apn="movistar.es"
+      user="MOVISTAR"
+      password="MOVISTAR"
+      authtype="1"
+      type="dun"
+  />
+
+  <!-- overwrite APNs until they get updated in the upstream database -->
+
+  <apn carrier="ATT Phone"
+      overwrite="true"
+      mcc="310"
+      mnc="410"
+      apn="phone"
+      type="default,mms,supl,fota"
+      mmsc="http://mmsc.mobile.att.net"
+      mmsproxy="proxy.mobile.att.net"
+      mmsport="80"
+  />
+</apns>
