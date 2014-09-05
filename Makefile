@@ -72,7 +72,7 @@ WGET_OPTS?=-c
 GAIA_DOMAIN?=gaiamobile.org
 
 DEBUG?=0
-DEVICE_DEBUG?=0
+DEVICE_DEBUG?=1
 NO_LOCK_SCREEN?=0
 PRODUCTION?=0
 DESKTOP_SHIMS?=0
@@ -115,7 +115,7 @@ NOFTU?=0
 # Disable first time ping
 NOFTUPING?=0
 # Automatically enable remote debugger
-REMOTE_DEBUGGER?=0
+REMOTE_DEBUGGER?=1
 # Debug mode for build process
 BUILD_DEBUG?=0
 
@@ -936,6 +936,7 @@ forward:
 # install-gaia is alias to build & push to device.
 .PHONY: install-gaia
 install-gaia: $(PROFILE_FOLDER) push
+install-phone: install-gaia
 
 # If your gaia/ directory is a sub-directory of the B2G directory, then
 # you should use:
@@ -979,6 +980,7 @@ dogfood: reset-gaia
 
 # Remove everything and install a clean profile
 reset-gaia: purge install-gaia install-default-data
+reset-phone: reset-gaia
 
 # remove the memories and apps on the phone
 purge:
