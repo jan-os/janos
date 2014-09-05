@@ -17,6 +17,13 @@ For a quicker non-destructive build run:
 make install-phone
 ```
 
+## Connect to the outside world
+
+Place a SIM card in the SIM slot and it will connect to cell network.
+It also enables data. You can connect to wifi by copying the file in
+[wifi_credentials.json.example](js/wifi_credentials.json.example) to
+`js/wifi_credentials.json` and filling in your credentials.
+
 ## What can it do?
 
 Display 'Hello world'. But it's really meant to be used when you take apart

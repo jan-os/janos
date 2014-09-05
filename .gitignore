@@ -73,3 +73,5 @@ mozilla-b2g-gaia-node-modules-*
 
 venv/
 travis_venv/
+
+apps/system/js/wifi_credentials.json
