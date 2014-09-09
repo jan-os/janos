@@ -42,7 +42,7 @@ window.addEventListener('load', function() {
 });
 
 function go(config) {
-  config = config || { roaming: false };
+  window.config = config = config || { roaming: false };
 
   // Disable data first for some f* reason
   navigator.mozSettings.createLock().set({

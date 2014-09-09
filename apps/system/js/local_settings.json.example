@@ -1,5 +1,6 @@
 {
   "network": "Name of your wifi",
   "password": "Your password",
-  "roaming": false
+  "roaming": false,
+  "bluetoothAudioAddress": "Bl:ue:to:ot"
 }

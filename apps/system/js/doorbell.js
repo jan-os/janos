@@ -1,19 +1,37 @@
 window.doorbell = {
+  _bt: null,
+  _audio: new Audio('/sounds/doorbell.ogg'),
+
   start: function() {
-    window.addEventListener('userproximity', this.proximity);
+    if (!window.config.bluetoothAudioAddress) {
+      throw 'No bluetoothAudioAddress found in config!';
+    }
+
+    this._bt = window.enableBluetoothAudio(window.config.bluetoothAudioAddress);
+    return this._bt.then(function() {
+      // @todo: handle bluetooth disconnect
+
+      window.addEventListener('userproximity', this.proximity.bind(this));
+
+      console.log('[Doorbell] Ready!');
+    }.bind(this));
   },
 
   proximity: function(e) {
     if (e.near) {
-      var audio = new Audio('/sounds/doorbell.ogg');
-      audio.mozAudioChannelType = 'content';
-      audio.play();
-      
+      this._audio.loop = true;
+      this._audio.play();
+
       navigator.vibrate(200);
+    }
+    else {
+      this._audio.pause();
     }
   },
 
   stop: function() {
+    this._bt = null;
+
     window.removeEventListener('userproximity', this.proximity);
   }
 };
