@@ -1,45 +1,85 @@
+// No clue why this is needed but it works.
 navigator.mozPower.screenBrightness = 0.9;
 
-// No clue why this is needed but it works.
-setTimeout(function() {
+window.addEventListener('load', function() {
   navigator.mozPower.screenEnabled = true;
   navigator.mozPower.screenBrightness = 1;
-}, 100);
 
-// We don't have access to sensors when we set screenEnabled to false
-// and dont want to flash custom Gecko
-window.screen = {
-  on: function() {
-    navigator.mozPower.screenBrightness = 1;
-  },
-  off: function() {
-    navigator.mozPower.screenBrightness = 0;
-  },
-  get isOn() {
-    return navigator.mozPower.screenBrightness !== 0;
+  // Gecko can send us system messages!
+  var evt = new CustomEvent('mozContentEvent',
+      { bubbles: true, cancelable: false,
+        detail: { type: 'system-message-listener-ready' } });
+  window.dispatchEvent(evt);
+
+  // Load config file
+  var x = new XMLHttpRequest();
+  x.onload = function() {
+    if (x.status !== 200) {
+      return console.error('Could not fetch js/local_settings.json', x.status);
+    }
+
+    var c = x.response;
+    go(c);
+  };
+  x.onerror = function() {
+    return console.error('Could not fetch js/local_settings.json', x.error);
+    go(null);
+  };
+
+  x.open('GET', '/js/local_settings.json');
+  x.responseType = 'json';
+  try {
+    x.send();
   }
-};
-
-// For every SIM card enable radio
-[].forEach.call(navigator.mozMobileConnections, function(conn, ix) {
-  var sre = conn.setRadioEnabled(true);
-  sre.onsuccess = function() {
-    dump('setRadioEnabled for SIM ' + ix + ' succeeded\n');
-  };
-  sre.onerror = function(e) {
-    dump('setRadioEnabled for SIM ' + ix + ' failed ' + sre.error + '\n');
-  };
+  catch (ex) {
+    console.error('Could not find js/local_settings.json', ex);
+    go(null);
+  }
 });
 
-// Enable data
-var dataReq = navigator.mozSettings.createLock().set({ 'ril.data.enabled': true })
-dataReq.onerror = function() {
-  dump('Failed to enable data ' + dataReq.error + '\n');
-};
+function go(config) {
+  config = config || { roaming: false };
 
-// Connect to Wifi
-(function() {
-  function connect(network, pass) {
+  // Disable data first for some f* reason
+  navigator.mozSettings.createLock().set({
+    'ril.data.enabled': false,
+    'ftu.ril.data.enabled': false,
+    'ril.data.roaming_enabled': config.roaming
+  });
+
+  // For every SIM card enable radio
+  (function enableRadio() {
+    [].forEach.call(navigator.mozMobileConnections, function(conn) {
+      conn.addEventListener('radiostatechange', function() {
+        console.log('radiostate is now', conn.radioState);
+      });
+
+      console.log('at startup conn has', conn.radioState);
+
+      function rsc() {
+        // Sometimes radioState is enabled here,
+        // and thats wrong so we should do this again after that
+        if (conn.radioState === 'disabled') {
+          conn.removeEventListener('radiostatechange', rsc);
+        }
+
+        var sre = conn.setRadioEnabled(true);
+        sre.onerror = function() {
+          console.error('Failed to enable radio for', conn);
+        };
+      }
+
+      if (conn.radioState === 'disabled') {
+        rsc();
+      }
+      else {
+        conn.addEventListener('radiostatechange', rsc);
+      }
+    });
+  })();
+
+  // Connect to Wifi
+  function connectToWifi(network, pass) {
     var n = navigator.mozWifiManager.getNetworks();
     n.onsuccess = function() {
       var wifi = n.result.filter(function(w) { return w.ssid === network })[0];
@@ -60,26 +100,53 @@ dataReq.onerror = function() {
       console.error('GetNetworks failed', e);
     };
   }
+  if (config.network && config.password) {
+    navigator.mozSettings.createLock().set({ 'wifi.enabled': true }).onsuccess = function() {
+      connectToWifi(config.network, config.password);
 
-  var x = new XMLHttpRequest();
-  x.onload = function() {
-    if (x.status !== 200) {
-      return console.error('Could not fetch js/wifi_credentials.json', x.status);
-    }
-
-    var c = x.response;
-    connect(c.network, c.password);
-  };
-  x.onerror = function() {
-    return console.error('Could not fetch js/wifi_credentials.json', x.error);
-  };
-
-  x.open('GET', '/js/wifi_credentials.json');
-  x.responseType = 'json';
-  try {
-    x.send();
+      window.reconnectWifi = connectToWifi.bind(this, config.network, config.password);
+    };
   }
-  catch (ex) {
-    console.error('Could not find js/wifi_credentials.json', ex);
+  else {
+    navigator.mozSettings.createLock().set({ 'wifi.enabled': false });
   }
-})();
+
+  navigator.mozIccManager.oniccdetected = function(e) {
+    console.log('new icc detected', e.iccId);
+    enableOperatorVariantHandler(e.iccId, 0); // <- multi sim bug would this be
+  }
+
+  function enableOperatorVariantHandler(id, ix) {
+    window.iccManager = navigator.mozIccManager;
+
+    window['ovh' + ix] = new OperatorVariantHandler(id, ix);
+    window['ovh' + ix].init();
+
+    setTimeout(function() {
+      console.log('Tried enabling data');
+      navigator.mozSettings.createLock().set({
+        'ril.data.enabled': true,
+        'ftu.ril.data.enabled': true,
+        'ril.data.roaming_enabled': true
+      });
+    }, 3000);
+
+    var conn = navigator.mozMobileConnections[ix];
+    var lastState = conn.data.connected;
+    conn.addEventListener('datachange', function(e) {
+      // console.log('datachange', e);
+      if (conn.data.connected === lastState) {
+        return;
+      }
+
+      if (conn.data.connected) {
+        console.log('Has connection over cellular network');
+      }
+      else {
+        console.log('Lost connection over cellular network');
+      }
+
+      lastState = conn.data.connected;
+    });
+  }
+}

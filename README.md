@@ -21,8 +21,8 @@ make install-phone
 
 Place a SIM card in the SIM slot and it will connect to cell network.
 It also enables data. You can connect to wifi by copying the file in
-[wifi_credentials.json.example](js/wifi_credentials.json.example) to
-`js/wifi_credentials.json` and filling in your credentials.
+[local_settings.json.example](js/local_settings.json.example) to
+`js/local_settings.json` and filling in your credentials.
 
 ## What can it do?
 

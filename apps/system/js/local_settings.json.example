@@ -1,0 +1,5 @@
+{
+  "network": "Name of your wifi",
+  "password": "Your password",
+  "roaming": false
+}
