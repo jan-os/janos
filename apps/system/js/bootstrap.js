@@ -1,9 +1,13 @@
 // No clue why this is needed but it works.
 navigator.mozPower.screenBrightness = 0.9;
 
-window.addEventListener('load', function() {
+setTimeout(function() {
   navigator.mozPower.screenEnabled = true;
   navigator.mozPower.screenBrightness = 1;
+}, 100);
+
+window.addEventListener('load', function() {
+  navigator.vibrate([ 200, 200, 200 ]);
 
   // Gecko can send us system messages!
   var evt = new CustomEvent('mozContentEvent',
@@ -44,7 +48,8 @@ function go(config) {
   navigator.mozSettings.createLock().set({
     'ril.data.enabled': false,
     'ftu.ril.data.enabled': false,
-    'ril.data.roaming_enabled': config.roaming
+    'ril.data.roaming_enabled': false,
+    'wifi.enabled': false
   });
 
   // For every SIM card enable radio
@@ -78,8 +83,54 @@ function go(config) {
     });
   })();
 
+  window.enableWifi = function() {
+    if (config.network && config.password) {
+      window.reconnectWifi = connectToWifi.bind(this, config.network, config.password);
+      navigator.mozSettings.createLock().set({ 'wifi.enabled': true });
+    }
+    else {
+      console.error('Please specify network / password in local_settings.json');
+    }
+  };
+
+  navigator.mozWifiManager.onenabled = function() {
+    if (!window.reconnectWifi) {
+      return;
+    }
+
+    setTimeout(function() {
+      window.reconnectWifi();
+    }, 1000);
+  };
+  navigator.mozWifiManager.ondisabled = function() {
+    console.log('Wifi was disabled');
+  };
+
+  var lastIp = null;
+  navigator.mozWifiManager.onconnectioninfoupdate = function(e) {
+    if (e.ipAddress && lastIp !== e.ipAddress) {
+      console.log('Wifi now has IP', e.ipAddress);
+    }
+    lastIp = e.ipAddress;
+  };
+
+  var lastWifiStatus = null;
+  navigator.mozWifiManager.onstatuschange = function(e) {
+    if (e.status !== lastWifiStatus) {
+      if (e.status === 'connected') {
+        console.log('Wifi is now connected to', config.network);
+      }
+      else {
+        console.log('Wifi statuschange', e.status);
+      }
+      lastWifiStatus = e.status;
+    }
+  };
+
   // Connect to Wifi
   function connectToWifi(network, pass) {
+    console.log('Attempting to connect to', network);
+
     var n = navigator.mozWifiManager.getNetworks();
     n.onsuccess = function() {
       var wifi = n.result.filter(function(w) { return w.ssid === network })[0];
@@ -87,34 +138,27 @@ function go(config) {
         return console.error('Could not find wifi network "' + network + '"');
       }
 
-      wifi.password = pass;
+      // Only PSK at the moment
+      wifi.keyManagement = 'WPA-PSK';
+      wifi.psk = pass;
+
       var req = navigator.mozWifiManager.associate(wifi);
       req.onsuccess = function() {
-        console.log('Wifi connected');
+        console.log('Associated with', config.network);
       };
       req.onerror = function() {
-        console.error('Wifi connection failed', req.error);
+        console.error('Associating failed', req.error);
       };
     };
     n.onerror = function(e) {
       console.error('GetNetworks failed', e);
     };
   }
-  if (config.network && config.password) {
-    navigator.mozSettings.createLock().set({ 'wifi.enabled': true }).onsuccess = function() {
-      connectToWifi(config.network, config.password);
-
-      window.reconnectWifi = connectToWifi.bind(this, config.network, config.password);
-    };
-  }
-  else {
-    navigator.mozSettings.createLock().set({ 'wifi.enabled': false });
-  }
 
   navigator.mozIccManager.oniccdetected = function(e) {
     console.log('new icc detected', e.iccId);
     enableOperatorVariantHandler(e.iccId, 0); // <- multi sim bug would this be
-  }
+  };
 
   function enableOperatorVariantHandler(id, ix) {
     window.iccManager = navigator.mozIccManager;
@@ -127,7 +171,7 @@ function go(config) {
       navigator.mozSettings.createLock().set({
         'ril.data.enabled': true,
         'ftu.ril.data.enabled': true,
-        'ril.data.roaming_enabled': true
+        'ril.data.roaming_enabled': config.roaming
       });
     }, 3000);
 
@@ -149,4 +193,34 @@ function go(config) {
       lastState = conn.data.connected;
     });
   }
+
+  // Autogrant permissions
+  window.addEventListener('mozChromeEvent', function(evt) {
+    var detail = evt.detail;
+    switch (detail.type) {
+    case 'permission-prompt':
+      console.log('autogrant permissions for', detail.permissions);
+
+      var ev2 = document.createEvent('CustomEvent');
+      ev2.initCustomEvent('mozContentEvent', true, true, {
+        id: detail.id,
+        type: 'permission-allow',
+        remember: true
+      });
+      window.dispatchEvent(ev2);
+      break;
+    }
+  });
 }
+
+window.testXhr = function() {
+  var x = new XMLHttpRequest({ mozSystem: true });
+  x.onload = function() {
+    console.log('xhr onload', x.status);
+  };
+  x.onerror = function() {
+    console.error('xhr onerror', x.error);
+  };
+  x.open('GET', 'http://janjongboom.com');
+  x.send();
+};

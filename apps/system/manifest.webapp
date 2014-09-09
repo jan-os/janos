@@ -1,12 +1,12 @@
 {
-  "name": "System",
+  "name": "The OS",
   "type": "certified",
   "role": "system",
   "description": "Main System",
   "launch_path": "/index.html",
   "developer": {
-    "name": "The Gaia Team",
-    "url": "https://github.com/mozilla-b2g/gaia"
+    "name": "Jan Jongboom",
+    "url": "https://github.com/janjongboom/janos"
   },
   "permissions": {
     "alarms": {},
