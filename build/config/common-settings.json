@@ -218,7 +218,7 @@
    "ums.volume.sdcard.enabled": true,
    "ums.volume.extsdcard.enabled": false,
    "vibration.enabled": true,
-   "wifi.enabled": true,
+   "wifi.enabled": false,
    "wifi.screen_off_timeout": 600000,
    "wifi.suspended": false,
    "wifi.disabled_by_wakelock": false,

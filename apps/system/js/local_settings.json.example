@@ -2,5 +2,9 @@
   "network": "Name of your wifi",
   "password": "Your password",
   "roaming": false,
-  "bluetoothAudioAddress": "Bl:ue:to:ot"
+  "bluetoothAudioAddress": "Bl:ue:to:ot",
+  "tracker": {
+    "serverUrl": "see https://github.com/janjongboom/janos-tracker-server, put no trailing slash at the end",
+    "deviceId": ""
+  }
 }

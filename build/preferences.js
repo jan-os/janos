@@ -132,7 +132,7 @@ PreferencesBuilder.prototype.setDesktopPref = function() {
   // Settings so desktop shims will work
   this.prefs['bluetooth.enabled'] = true;
   this.prefs['bluetooth.visible'] = false;
-  this.prefs['wifi.enabled'] = true;
+  this.prefs['wifi.enabled'] = false;
   this.prefs['wifi.suspended'] = false;
 
   // Partial implementation of gonk fonts
