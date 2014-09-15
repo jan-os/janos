@@ -1,6 +1,7 @@
 # Hi there!
 
-This is an OS for mobile phones. It's compatible with every Firefox OS device.
+This is an OS for display-less mobile phones. 
+It's compatible with every Firefox OS device.
 Connect a Firefox OS device to your computer and run:
 
 ```bash
@@ -24,7 +25,8 @@ Sometimes things won't work (no output in console), then just run reset-phone.
 ## Connect to the outside world
 
 Place a SIM card in the SIM slot and it will connect to cell network.
-It also enables data.
+It also enables data. Set roaming to true in the config to also make
+it work if you're abroad.
 
 You can connect to wifi by copying the file in
 [local_settings.json.example](js/local_settings.json.example) to
@@ -38,9 +40,16 @@ to enable it anyway.
 
 ## What can it do?
 
-Display 'Hello world'. But it's really meant to be used when you take apart
-a phone and embed it into something else. You have JS access to sensors, WiFi,
-etc.
+It comes with four 'recipes' you can do during talks:
+
+* Devicemotion
+* Security camera, takes photos on set interval and stores them on
+  the internal storage or SD card
+* Doorbell with proximity sensor & bluetooth speaker
+* Tracker with push messages and geolocation (see https://github.com/janjongboom/janos-tracker-server)
+
+But basically everything you want it to do. It's all JS and you have
+cool device APIs.
 
 ## Why?!
 
