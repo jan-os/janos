@@ -55,3 +55,8 @@ cool device APIs.
 
 Because playing with phones is awesome. Also for my talk at
 [JSConf.eu](http://2014.jsconf.eu/speakers/#/speakers/jan-jongboom-abusing-phones-to-make-the-internet-of-things).
+
+## What's up with the name
+
+The name comes from the Bengali word for life, which is pronounced as 'jan'. 
+It has nothing to do with the author of course.
