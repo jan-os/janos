@@ -34,7 +34,7 @@ You can connect to wifi by copying the file in
 This will only work with WPA networks for now, because I'm lazy.
 See shared/js/wifi_helper.js setPassword function for connecting to WEP and
 WPA-EAP networks and incorporate the code as needed.
-You need to be plugged into USB to enable wifi as otherwise the drain is too big
+You need to have a battery connected to enable wifi as otherwise the drain is too big
 and the device will shut down (at least on GP Peak). Call `window.enableWifi()`
 to enable it anyway.
 
