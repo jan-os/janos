@@ -247,7 +247,7 @@ function execute(config) {
     settings['lockscreen.locked'] = false;
   }
 
-  setDefaultKeyboardLayouts(config.GAIA_DEFAULT_LOCALE, settings, config);
+  // setDefaultKeyboardLayouts(config.GAIA_DEFAULT_LOCALE, settings, config);
 
   var queue = utils.Q.defer();
   queue.resolve();
