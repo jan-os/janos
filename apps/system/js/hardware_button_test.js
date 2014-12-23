@@ -1,5 +1,3 @@
-console.log('here');
-
 var hardwareButtons = new HardwareButtons();
 
 hardwareButtons.start(); // Attach the event listeners
