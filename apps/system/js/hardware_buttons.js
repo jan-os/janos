@@ -119,6 +119,8 @@
 
         if(type.match(/press$/)){
           this._states[type.replace(/press$/, 'release')] = false;
+        } else {
+          this._states[type.replace(/release$/, 'press')] = false;
         }
         
         // Debouncing all hardware buttons
