@@ -36,6 +36,7 @@
    **/
   var HardwareButtons = function HardwareButtons() {
     this._started = false;
+    this._states = {};
   };
 
   /**
@@ -97,29 +98,38 @@
     var hardwareHomeEvent =
       (this.browserKeyEventManager.isHardwareKeyEvent(evt.type)) &&
       this.browserKeyEventManager.isHomeKey(evt);
+    
+    var type;
 
     if (evt.type === 'softwareButtonEvent' || evt.type === 'mozChromeEvent') {
-      var type = evt.detail.type;
-      switch (type) {
-        case 'home-button-press':
-        case 'home-button-release':
-        case 'sleep-button-press':
-        case 'sleep-button-release':
-        case 'volume-up-button-press':
-        case 'volume-up-button-release':
-        case 'volume-down-button-press':
-        case 'volume-down-button-release':
-          window.dispatchEvent(new CustomEvent(type));
-          break;
-      }
+      type = evt.detail.type;
     } else {
-      var buttonEventType = this.browserKeyEventManager.getButtonEventType(evt);
-      // having a falsey buttonEventType value means the event should be
-      // ignored by System
-      if (!buttonEventType) {
-        return;
-      }
-      window.dispatchEvent(new CustomEvent(buttonEventType));
+      type = this.browserKeyEventManager.getButtonEventType(evt);
+    }
+    
+    switch (type) {
+      case 'home-button-press':
+      case 'home-button-release':
+      case 'sleep-button-press':
+      case 'sleep-button-release':
+      case 'volume-up-button-press':
+      case 'volume-up-button-release':
+      case 'volume-down-button-press':
+      case 'volume-down-button-release':
+
+        if(type.match(/press$/)){
+          this._states[type.replace(/press$/, 'release')] = false;
+        }
+        
+        // Debouncing all hardware buttons
+        if(this._states[type]){
+          return;
+        }
+
+        this._states[type] = true;
+
+        window.dispatchEvent(new CustomEvent(type));
+        break;
     }
   };
 
