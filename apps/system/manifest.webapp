@@ -46,7 +46,8 @@
     "downloads":{},
     "systemXHR":{},
     "feature-detection": {},
-    "push": { "description": "To track you!" }
+    "push": { "description": "To track you!" },
+    "before-after-keyboard-event": {}
   },
   "locales": {
     "ar": {
