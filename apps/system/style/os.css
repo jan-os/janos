@@ -1,0 +1,12 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: black;
+  color: white;
+  font-family: sans-serif;
+  font-size: 10px;
+}
+pre {
+  padding: 3vw;
+  font-size: calc(100vw / 30);
+}

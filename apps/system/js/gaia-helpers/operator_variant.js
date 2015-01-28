@@ -17,7 +17,7 @@
   // This json file should always be accessed from the root instead of the
   // current working base URL so that it can work in unit-tests as well
   // as during normal run time.
-  var OPERATOR_VARIANT_FILE = '/js/apn.json';
+  var OPERATOR_VARIANT_FILE = '/js/gaia-helpers/apn.json';
 
   var APN_TYPES = ['default', 'mms', 'supl', 'dun', 'ims'];
   var AUTH_TYPES = ['none', 'pap', 'chap', 'papOrChap'];

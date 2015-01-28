@@ -31,20 +31,29 @@ window.camera = {
           return error('No back camera found on your device');
         }
 
-        cameraApi.getCamera(id, {
+        var options = {
           mode: 'picture',
-          recorderProfile: 'jpg',
           previewSize: {
-            width: 352,
-            height: 288
+            width: 640,
+            height: 480
           }
-        }, function(c) {
+        };
+        var onsuccess = function(c) {
           self._camera = c;
           self._cameraId = id;
           done(c);
-        }, function() {
+        };
+        var onerror = function(err) {
+          console.error(err);
           error('Could not get the camera. Is another application using the camera?');
-        });
+        };
+
+        var cameraReq = cameraApi.getCamera(id, options, onsuccess, onerror);
+        if (cameraReq && cameraReq.then) {
+          cameraReq.then(params => {
+            onsuccess(params.camera);
+          }, onerror);
+        }
       });
     });
   },
@@ -82,22 +91,58 @@ window.camera = {
     }.bind(this));
   },
 
+  _tpTimeout: null,
+
   takePicture: function(cameraId) {
-    var blob;
+    var self = this;
+    var picture;
     return this._getCamera(cameraId).then(function(c) {
       return new Promise(function(res, rej) {
-        c.takePicture({}, function(aBlob) {
-          blob = aBlob;
-          res();
-        }, rej);
+        // @todo, format raw, what is that? Should avoid recompression.
+        var options = {
+          dateTime: Date.now() / 1000 | 0,
+          fileFormat: 'jpeg',
+          position: null,
+          orientation: 0 // @todo
+        };
+
+        // @todo: if we have 5 in a row or so something is fucked up
+        // need to force a reboot
+        self._tpTimeout = setTimeout(() => {
+          console.warn('Taking picture timed out');
+          rej('Taking picture timed out');
+        }, 5000);
+
+        // @todo: autofocus if supported
+        c.pictureQuality = 1.0; // we compress later
+        if ('setPictureSize' in c) {
+          c.setPictureSize({ width: 640, height: 480 });
+        }
+
+        var onsuccess = function(aBlob) {
+          picture = { blob: aBlob, sensorAngle: c.sensorAngle };
+          res(picture);
+        };
+        var onerror = function(err) {
+          rej(err);
+        };
+
+        var tpReq = c.takePicture(options, onsuccess, onerror);
+        if (tpReq && tpReq.then) {
+          tpReq.then(onsuccess, onerror);
+        }
       });
     })
     .then(this.releaseCamera.bind(this))
     .then(function() {
-      return blob;
+      clearTimeout(self._tpTimeout);
+      return picture;
+    }).catch(err => {
+      self.releaseCamera();
+      return Promise.reject(err); // ? is this correct way of doing it?
     });
   },
-  
+
   getAllCameras: function() {
     var cameraApi = navigator.mozCameras || navigator.mozCamera;
     return cameraApi.getListOfCameras();

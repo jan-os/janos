@@ -1,10 +1,24 @@
 {
-  "network": "Name of your wifi",
-  "password": "Your password",
-  "roaming": false,
-  "bluetoothAudioAddress": "Bl:ue:to:ot",
+  "wifi": {
+    "enabled": false,
+    "network": "Name of your wifi",
+    "password": "Your password"
+  },
+  "cellular": {
+    "roaming": false,
+    "edgeOnly": false,
+    "pin": "0000"
+  },
+  "bluetooth": {
+    "audioAddress": "Bl:ue:to:ot"
+  },
   "tracker": {
     "serverUrl": "see https://github.com/janjongboom/janos-tracker-server, put no trailing slash at the end",
-    "deviceId": ""
+    "deviceId": "",
+    "fallbackCoords": {
+      "latitude": 59.900447,
+      "longitude": 10.630135,
+      "accuracy": 50
+    }
   }
 }
