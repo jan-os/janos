@@ -96,7 +96,7 @@ new Promise(res => {
   startWifi(localSettings.wifi);
   startAutogrant();
 
-  document.dispatchEvent(new CustomEvent('ready', { detail: localSettings }));
+  window.dispatchEvent(new CustomEvent('ready', { detail: localSettings }));
 }).catch(err => {
   navigator.vibrate(200);
 
@@ -273,7 +273,8 @@ function startWifi(options) {
 
   if (options.enabled && !options.network) {
     return console.error('WiFi network required');
-
+  }
+  else if (options.enabled) {
     setTimeout(() => {
       enableWifi();
     });
@@ -360,11 +361,9 @@ function startWifi(options) {
       wifiManager.onstatuschange = function(e) {
         switch (e.status) {
           case 'connected':
-            navigator.vibrate([500]);
             res();
             break;
           case 'disconnected':
-            navigator.vibrate([200]);
             rej('Could not connect to network');
             break;
           default:
@@ -447,6 +446,6 @@ window.testXhr = function() {
   x.onerror = function() {
     console.error('xhr onerror', x.error);
   };
-  x.open('GET', 'http://janjongboom.com');
+  x.open('GET', 'http://www.telenor.com');
   x.send();
 };
