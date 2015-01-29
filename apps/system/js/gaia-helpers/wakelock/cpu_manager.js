@@ -42,13 +42,6 @@
   };
 
   CpuManager.prototype._handleWakeLockChange = function(isHeld) {
-    if ('log' in window) {
-      window.log.info('handleWakelockChange', isHeld);
-    }
-    else {
-      console.log('handleWakelockChange', isHeld);
-    }
-
     navigator.mozPower.cpuSleepAllowed = !isHeld;
   };
 

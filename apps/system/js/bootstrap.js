@@ -119,7 +119,9 @@ function startRadio(options) {
     if (!icc) {
       return;
     }
-    console.log('new icc detected', icc.iccInfo.iccid, icc.cardState);
+    if (icc.cardState !== 'ready') {
+      console.log('SIM Card state', icc.iccInfo.iccid, icc.cardState);
+    }
     if (icc.cardState === 'pinRequired') {
       if (!options.pin) {
         console.warn('SIM needs PIN but no PIN supplied');
@@ -138,8 +140,8 @@ function startRadio(options) {
     [].forEach.call(navigator.mozMobileConnections, function(conn) {
       conn.setPreferredNetworkType(networkType[0]);
 
-      conn.onradiostatechange = function () {
-        console.log('radiostate is now', conn.radioState);
+      conn.onradiostatechange = function() {
+        console.log('Radio state change', conn.radioState);
 
         if (conn.radioState === 'enabled') {
           // @todo multisim bug
@@ -150,8 +152,6 @@ function startRadio(options) {
           }, 5000);
         }
       };
-
-      console.log('at startup conn has', conn.radioState);
 
       function rsc() {
         // Sometimes radioState is enabled here,
