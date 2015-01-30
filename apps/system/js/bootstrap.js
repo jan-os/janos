@@ -295,7 +295,10 @@ function startWifi(options) {
   // 6. If onstatuschange goes to disconnect, reject the promise
 
   // We need to have some wrappers around wifi connections in place
-  function enableWifi() {
+  function enableWifi(network, password) {
+    if (network) options.network = network;
+    if (password) options.password = password;
+    
     options.enabled = true;
     navigator.mozSettings.createLock().set({ 'wifi.enabled': true });
   }
