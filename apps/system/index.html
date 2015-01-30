@@ -4,22 +4,39 @@
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
     <meta charset="utf-8">
 
+    <!-- When a screen is attached, allows us to see the logo. -->
+    <link rel="stylesheet" href="style/os.css">
+
+    <!-- This bootstraps the OS. Do not remove unless you understand what you're doing. -->
     <script src="js/bootstrap.js"></script>
 
-    <!-- Stuff from gaia regarding operators and stuff -->
+    <!-- Things we borrow from Gaia (http://github.com/mozilla-b2g/gaia).
+         Needed for things like cellular internet and power management. -->
     <script defer src="js/gaia-helpers/apn_helper.js"></script>
     <script defer src="js/gaia-helpers/operator_variant_helper.js"></script>
     <script defer src="js/gaia-helpers/operator_variant.js"></script>
+    <script defer src="js/gaia-helpers/wakelock/wake_lock_manager.js"></script>
+    <script defer src="js/gaia-helpers/wakelock/cpu_manager.js"></script>
 
-    <!-- Own scripts -->
-    <script defer src="js/camera.js"></script>
-    <script defer src="js/security_cam.js"></script>
-    <script defer src="js/doorbell.js"></script>
-    <script defer src="js/bluetooth.js"></script>
-    <script defer src="js/tracker.js"></script>
+    <!-- The camera API can be quite verbose. We have an easier one. -->
+    <script defer src="js/api/camera.js"></script>
+
+    <!-- Your own scripts go here -->
+    <script defer src="js/examples/security_cam.js"></script>
+    <script defer src="js/examples/doorbell.js"></script>
+    <script defer src="js/examples/bluetooth.js"></script>
+    <script defer src="js/examples/tracker.js"></script>
+    <script defer src="js/examples/motion.js"></script>
   </head>
 
   <body>
-    <h1>OMG WELCOME TO JANOS 1.0!</h1>
+    <!-- The logo -->
+    <pre>     ____.              ________    _________
+    |    |____    ____  \_____  \  /   _____/
+    |    \__  \  /    \  /   |   \ \_____  \
+/\__|    |/ __ \|   |  \/    |    \/        \
+\________(____  /___|  /\_______  /_______  /
+              \/     \/         \/        \/</pre>
+    <pre class="status">Booting up</pre>
   </body>
 </html>
