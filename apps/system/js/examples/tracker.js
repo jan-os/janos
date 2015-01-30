@@ -3,7 +3,16 @@ window.addEventListener('ready', ev => {
   var config = ev.detail;
 
   window.tracker = {
-    start: function() {
+    start: function(serverUrl, deviceId) {
+      if (serverUrl && deviceId) {
+        if (deviceId === 'YOUR_NAME') {
+          return console.error('Use a real name instead YOUR_NAME :-)');
+        }
+        config.tracker = config.tracker || {};
+        config.tracker.serverUrl = serverUrl;
+        config.tracker.deviceId = deviceId;
+      }
+
       var self = this;
 
       if (!config.tracker) {
@@ -71,7 +80,7 @@ window.addEventListener('ready', ev => {
     console.log('[Tracker] got push message!', msg);
 
     var options = {
-      enableHighAccuracy: true,
+      enableHighAccuracy: false,
       timeout: 10000,
       maximumAge: 10000
     };
@@ -100,11 +109,18 @@ window.addEventListener('ready', ev => {
       console.error('ERROR(' + err.code + '): ' + err.message);
 
       // send fake location
-      if (config.tracker.fallbackCoords) {
-        success({
-          coords: config.tracker.fallbackCoords
-        });
+      if (!config.tracker.fallbackCoords) {
+        config.tracker.fallbackCoords = {
+          latitude: 59.900447,
+          longitude: 10.630135,
+          accuracy: 50
+        };
       }
+
+      console.log('Sending fake location instead');
+      success({
+        coords: config.tracker.fallbackCoords
+      });
     }
 
     navigator.geolocation.getCurrentPosition(success, error, options);

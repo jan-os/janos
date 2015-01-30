@@ -18,6 +18,7 @@ window.addEventListener('ready', ev => {
           var discoveryTimeout = setTimeout(function() {
             console.error('Could not find device within 30s');
             adapter.stopDiscovery();
+            adapter.ondevicefound = null;
             navigator.mozSettings.createLock().set({ 'bluetooth.enabled': false });
 
             rej('Discovery timed out');
@@ -31,10 +32,12 @@ window.addEventListener('ready', ev => {
                 var connRequest = adapter.connect(e.device);
                 connRequest.onsuccess = function() {
                   console.log('[BT] Connected');
+                  adapter.ondevicefound = null;
                   res();
                 };
                 connRequest.onerror = function() {
                   console.error('[BT] Could not connect', connRequest.error);
+                  adapter.ondevicefound = null;
                   rej(connRequest.error);
                 };
               }
@@ -85,6 +88,39 @@ window.addEventListener('ready', ev => {
       }
     });
   };
-  
+
+  window.findBluetoothDevices = function(discoveryTimeout) {
+    if (!navigator.mozBluetooth.enabled) {
+      navigator.mozSettings.createLock().set({ 'bluetooth.enabled': true });
+    }
+    else {
+      discover();
+    }
+
+    navigator.mozBluetooth.onenabled = function() {
+      discover();
+    };
+
+    function discover() {
+      var adapterReq = navigator.mozBluetooth.getDefaultAdapter();
+      adapterReq.onsuccess = function() {
+        var adapter = adapterReq.result;
+
+        setTimeout(function() {
+          console.log('Stopping discovery');
+          adapter.ondevicefound = null;
+          adapter.stopDiscovery();
+        }, discoveryTimeout || 10000);
+
+        adapter.ondevicefound = function(e) {
+          console.log('Found device', e.device.address, e.device.name, e.device.icon);
+        };
+
+        console.log('Starting discovery');
+        adapter.startDiscovery();
+      };
+    }
+  };
+
   console.log('Bluetooth ready');
 });

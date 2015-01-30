@@ -3,8 +3,8 @@ window.addEventListener('ready', () => {
     _bt: null,
     _audio: new Audio('/sounds/doorbell.ogg'),
 
-    start: function() {
-      this._bt = window.enableBluetoothAudio();
+    start: function(address) {
+      this._bt = window.enableBluetoothAudio(address);
       return this._bt.then(function() {
         // @todo: handle bluetooth disconnect
 
