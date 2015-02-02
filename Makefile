@@ -938,6 +938,10 @@ forward:
 install-gaia: $(PROFILE_FOLDER) push
 install-phone: install-gaia
 
+# Fake gaia-prefs now needed by build systems
+gaia-prefs:
+	@echo 'Make gaia-prefs'
+
 # If your gaia/ directory is a sub-directory of the B2G directory, then
 # you should use:
 #
