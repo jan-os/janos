@@ -582,6 +582,7 @@ endif
 profile-dir:
 	@test -d $(PROFILE_FOLDER) || mkdir -p $(PROFILE_FOLDER)
 	@test -d $(PROFILE_FOLDER)/defaults || mkdir -p $(PROFILE_FOLDER)/defaults
+	@touch $(PROFILE_FOLDER)/defaults/empty
 
 # Copy preload contacts to profile
 contacts: profile-dir
