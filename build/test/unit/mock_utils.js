@@ -34,6 +34,9 @@ exports.psParser = function(content) {
   return content;
 };
 
+exports.setEnv = function() {
+};
+
 exports.getEnvPath = function() {
 };
 
@@ -71,6 +74,14 @@ exports.isSubjectToBranding = function(path) {
          /branding[\/\\]initlogo.png/.test(path);
 };
 
+exports.isSubjectToDeviceType = function(path) {
+  return /locales[\/\\]?[a-zA-Z]*[\/\\]?device_type$/.test(path);
+};
+
+exports.cloneJSON = function(obj) {
+  return JSON.parse(JSON.stringify(obj));
+};
+
 exports.existsInAppDirs =  function(appDirs, appName) {
   var apps = appDirs.split(' ');
   var exists = apps.some(function (appPath) {
@@ -80,4 +91,35 @@ exports.existsInAppDirs =  function(appDirs, appName) {
     return (appName === appFile.leafName);
   });
   return exists;
+};
+
+exports.getAppNameRegex = function(buildAppName) {
+  return buildAppName === '*' ? /.+/ : new RegExp(buildAppName);
+};
+
+exports.scriptLoader = {
+  load: function load() {}
+};
+
+exports.dirname = function(path) {
+  return path.substr(0, path.lastIndexOf('/'));
+};
+
+exports.basename = function(path) {
+  return path.substr(path.lastIndexOf('/')+1);
+};
+
+exports.gaia = {
+  getInstance: function(options) {
+    var rebuildWebapps = options.rebuildAppDirs.map(function(appDir) {
+      return {
+        appDir: {
+          path: appDir
+        }
+      };
+    });
+    return {
+      rebuildWebapps: rebuildWebapps
+    };
+  }
 };

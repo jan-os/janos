@@ -1,18 +1,14 @@
 APP_DIR := $(CURDIR)
 
 ifneq (,$(findstring MINGW32_,$(SYS)))
-APP_DIR:=$(shell pwd -W | sed -e 's|/|\\\\|g')
+  APP_DIR:=$(shell pwd -W | sed -e 's|/|\\\\|g')
 endif
 
 export APP_DIR
 
-define run-build-test
-  ./node_modules/.bin/mocha \
-    --harmony \
-    --reporter $(REPORTER) \
-    --ui tdd \
-    --timeout 180000 \
-    $(strip $1)
+define run-build-coverage
+  TEST_FILES_DIR=$1 node --harmony node_modules$(SEP)istanbul$(SEP)lib$(SEP)cli.js \
+  cover build$(SEP)test$(SEP)coverage-checker.js
 endef
 
 # rwildcard is used to recursive wildcard, it will travel all files in
@@ -22,8 +18,8 @@ endef
 rwildcard=$(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
 
 define run-js-command
-  $(XULRUNNERSDK) $(XPCSHELLSDK) \
-    -f "$(GAIA_DIR)/build/xpcshell-commonjs.js" \
+  $(2) $(XULRUNNERSDK) $(XPCSHELLSDK) \
+    -f "$(GAIA_DIR)$(SEP)build$(SEP)xpcshell-commonjs.js" \
     -e "run('$(strip $1)');"
 endef
 

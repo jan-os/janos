@@ -13,80 +13,83 @@
   /* jshint -W104 */
 
   var DEBUG = false;
-  var requiresInlineLocale = false; // netError requires inline locale
 
   var L10n = navigator.mozL10n._getInternalAPI();
 
-  navigator.mozL10n.bootstrap = function(callback, debug) {
-    var ctx = navigator.mozL10n.ctx = new L10n.Context();
-    requiresInlineLocale = false;
+  navigator.mozL10n.bootstrap = function(file, debug) {
+    var ctx = navigator.mozL10n.ctx = new L10n.Context(file);
 
     if (debug) {
       DEBUG = true;
     }
 
+    ctx.addEventListener('notfounderror', function(e) {
+      if (e.loc === 'en-US') {
+        throw e;
+      }
+    });
+
+    var error = addBuildMessage.bind(this, 'error');
+    var warn = addBuildMessage.bind(this, 'warn');
+
     if (DEBUG) {
-      ctx.addEventListener('error', addBuildMessage.bind(this, 'error'));
-      ctx.addEventListener('warning', addBuildMessage.bind(this, 'warn'));
+      ctx.addEventListener('fetcherror', error);
+      ctx.addEventListener('manifesterror', warn);
+      ctx.addEventListener('parseerror', warn);
+      ctx.addEventListener('resolveerror', warn);
+      ctx.addEventListener('notfounderror', error);
     }
-    initResources.call(this, callback);
+
+    initResources.call(this);
   };
 
-  function initResources(callback) {
-    var resLinks = document.head
-                           .querySelectorAll('link[type="application/l10n"]');
-    var iniLinks = [];
+  function initResources() {
+    /* jshint boss:true */
     var containsFetchableLocale = false;
-    var i;
 
-    for (i = 0; i < resLinks.length; i++) {
-      var link = resLinks[i];
-      var url = link.getAttribute('href');
-      var type = url.substr(url.lastIndexOf('.') + 1);
-      if (type === 'ini') {
-        if (!('noFetch' in link.dataset)) {
-          containsFetchableLocale = true;
-        }
-        iniLinks.push(url);
-      }
-      this.ctx.resLinks.push(url);
-    }
+    var meta = {};
+    var nodes = document.head
+                        .querySelectorAll('link[rel="localization"],' +
+                                          'meta[name="availableLanguages"],' +
+                                          'meta[name="defaultLanguage"]');
 
-    var iniLoads = iniLinks.length;
-    if (iniLoads === 0) {
-      onIniLoaded();
-      return;
-    }
-
-    function onIniLoaded() {
-      if (--iniLoads <= 0) {
-        if (!containsFetchableLocale) {
-          requiresInlineLocale = true;
-          document.documentElement.dataset.noCompleteBug = true;
-        }
-        callback();
+    for (var i = 0, node; node = nodes[i]; i++) {
+      var type = node.getAttribute('rel') || node.nodeName.toLowerCase();
+      switch (type) {
+        case 'localization':
+          if (!('noFetch' in node.dataset)) {
+            containsFetchableLocale = true;
+          }
+          this.ctx.resLinks.push(node.getAttribute('href'));
+          break;
+        case 'meta':
+          L10n.onMetaInjected.call(this, node, meta);
+          break;
       }
     }
 
-    for (i = 0; i < iniLinks.length; i++) {
-      L10n.loadINI.call(this, iniLinks[i], onIniLoaded);
+    if (!containsFetchableLocale) {
+      document.documentElement.dataset.noCompleteBug = true;
     }
+
+    var availableLangs = meta.availableLanguages ?
+      Object.keys(meta.availableLanguages) : null;
+
+    this.ctx.registerLocales(meta.defaultLanguage, availableLangs);
   }
 
 
   /* API for webapp-optimize */
 
   L10n.Locale.prototype.addAST = function(ast) {
-    if (!this.ast) {
-      this.ast = Object.create(null);
+    if (!this.astById) {
+      this.astById = Object.create(null);
     }
 
-    var keys = Object.keys(ast);
-
-    /* jshint -W084 */
-    for (var i = 0, key; key = keys[i]; i++) {
-      this.entries[key] = ast[key];
-      this.ast[key] = ast[key];
+    /* jshint boss:true */
+    for (var i = 0, node; node = ast[i]; i++) {
+      this.entries[node.$i] = L10n.Resolver.createEntry(node, this.entries);
+      this.astById[node.$i] = node;
     }
   };
 
@@ -96,6 +99,8 @@
     if (!this.isReady) {
       throw new L10n.Error('Context not ready');
     }
+
+    var sourceEntity = this.getLocale('en-US').astById[id];
 
     var cur = 0;
     var loc;
@@ -107,73 +112,43 @@
         locale.build(null);
       }
 
-      if (locale.ast && id in locale.ast) {
-        return locale.ast[id];
+      if (locale.astById && id in locale.astById) {
+        var entity = locale.astById[id];
+        if (loc === 'en-US' || areEntityStructsEqual(sourceEntity, entity)) {
+          return entity;
+        } else {
+          return sourceEntity;
+        }
       }
 
-      var e = new L10n.Error(id + ' not found in ' + loc, id, loc);
-      this._emitter.emit('warning', e);
+      this._emitter.emit('notfounderror', new L10n.Error(
+        '"' + id + '"' + ' not found in ' + loc + ' in' + this.id,
+        id, loc));
       cur++;
     }
     return '';
   };
 
-  // return an array of all {{placeables}} found in a string
-  function getPlaceableNames(str) {
-    /* jshint boss:true */
-    var placeables = [];
-    var match;
-    while (match = L10n.rePlaceables.exec(str)) {
-      placeables.push(match[1]);
-    }
-    return placeables;
-  }
-
-  // put all dependencies required for string interpolation in the AST
-  // XXX only first-level deps are supported for now to avoid having to check
-  // for cyclic and recursive references
-  function getPlaceables(ast, val) {
-    var placeables = getPlaceableNames(val);
-    for (var i = 0; i < placeables.length; i++) {
-      var id = placeables[i];
-      ast[id] = this.ctx.getEntitySource(id);
-    }
-  }
-
   navigator.mozL10n.translateDocument = L10n.translateDocument;
 
-  navigator.mozL10n.getDictionary = function getDictionary(fragment) {
+  navigator.mozL10n.getAST = function() {
     // don't do anything for pseudolocales
-    if (this.ctx.supportedLocales[0] in L10n.PSEUDO_STRATEGIES) {
+    if (this.ctx.supportedLocales[0] in this.qps) {
       return null;
     }
 
-    var ast = {};
+    var ast = [];
 
-    if (!fragment) {
-      // en-US is the de facto source locale of Gaia
-      var sourceLocale = this.ctx.getLocale('en-US');
-      if (!sourceLocale.isReady) {
-        sourceLocale.build(null);
-      }
-      // iterate over all strings in en-US
-      for (var id in sourceLocale.ast) {
-        ast[id] = this.ctx.getEntitySource(id);
-      }
-      flushBuildMessages.call(this, 'compared to en-US');
-      return ast;
+    // en-US is the de facto source locale of Gaia
+    var sourceLocale = this.ctx.getLocale('en-US');
+    if (!sourceLocale.isReady) {
+      sourceLocale.build(null);
     }
-
-    var elements = L10n.getTranslatableChildren(fragment);
-
-    for (var i = 0; i < elements.length; i++) {
-      var attrs = this.getAttributes(elements[i]);
-      var val = this.ctx.getEntitySource(attrs.id);
-      ast[attrs.id] = val;
-      L10n.walkContent(val, getPlaceables.bind(this, ast));
+    // iterate over all strings in en-US
+    for (var id in sourceLocale.astById) {
+      ast.push(this.ctx.getEntitySource(id));
     }
-    flushBuildMessages.call(this, 'in the visible DOM');
-
+    flushBuildMessages.call(this, 'compared to en-US');
     return ast;
   };
 
@@ -203,6 +178,23 @@
         buildMessages[type] = [];
       }
     }
+  }
+
+  function areEntityStructsEqual(entity1, entity2) {
+    var keys1 = Object.keys(entity1);
+    var keys2 = Object.keys(entity2);
+
+    if (keys1.length !== keys2.length) {
+      return false;
+    }
+
+    for (var i = 0; i < keys1.length; i++) {
+      if (keys2.indexOf(keys1[i]) === -1) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
 })(this);

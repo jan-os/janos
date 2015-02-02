@@ -556,9 +556,11 @@ LANG=POSIX # Avoiding sort order differences between OSes
 
 .PHONY: app
 app: b2g_sdk profile-dir
+	@$(call run-js-command,app)
 
 .PHONY: pre-app
 pre-app: b2g_sdk profile-dir
+	@$(call run-js-command,pre-app)
 
 # Keep old targets just for people/scripts still using it
 .PHONY: post-manifest
@@ -581,9 +583,6 @@ endif
 
 profile-dir:
 	@test -d $(PROFILE_FOLDER) || mkdir -p $(PROFILE_FOLDER)
-	@test -d $(PROFILE_FOLDER)/defaults || mkdir -p $(PROFILE_FOLDER)/defaults
-	@touch $(PROFILE_FOLDER)/defaults/empty
-	@echo "{}" > $(PROFILE_FOLDER)/settings.json
 
 # Copy preload contacts to profile
 contacts: profile-dir
@@ -685,10 +684,6 @@ ifeq ($(DEBUG),1)
 endif
 	@echo "Finished: Generating extensions"
 endif
-
-# some other stuff
-tools/pre-commit:
-	@echo 'Pre-commit'
 
 
 # this lists the programs we need in the Makefile and that are installed by npm
@@ -807,12 +802,12 @@ common-install:
 .PHONY: update-common
 update-common: common-install
 	# common testing tools
-	@echo 'Update common'
+	@echo 'update-common'
 
 # Create the json config file
 # for use with the test agent GUI
 test-agent-config:
-	@echo 'Test agent config'
+	@echo 'test-agent-config'
 
 # For test coverage report
 COVERAGE?=0

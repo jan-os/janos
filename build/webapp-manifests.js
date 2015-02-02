@@ -1,6 +1,10 @@
+'use strict';
+/* global require, exports */
 // Generate webapps_stage.json.
 
 var utils = require('./utils');
+
+const UUID_FILENAME = 'uuid.json';
 
 var ManifestBuilder = function() {
   this.INSTALL_TIME = Date.now();
@@ -26,8 +30,14 @@ ManifestBuilder.prototype.genStageWebappJSON = function() {
     JSON.stringify(this.stageManifests, null, 2) + '\n');
 };
 
+ManifestBuilder.prototype.genUuidJSON = function() {
+  var uuidFile = this.stageDir.clone();
+  uuidFile.append(UUID_FILENAME);
+  utils.writeContent(uuidFile,
+    JSON.stringify(utils.getUUIDMapping(this.config), null, 2) + '\n');
+};
+
 ManifestBuilder.prototype.fillExternalAppManifest = function(webapp) {
-  var type = webapp.appStatus;
   var isPackaged = false;
   if (webapp.pckManifest) {
     isPackaged = true;
@@ -38,13 +48,7 @@ ManifestBuilder.prototype.fillExternalAppManifest = function(webapp) {
     }
   }
 
-  // Generate the webapp folder name in the profile. Only if it's privileged
-  // and it has an origin in its manifest file it'll be able to specify a custom
-  // folder name. Otherwise, generate an UUID to use as folder name.
-  var webappTargetDirName = utils.generateUUID().toString();
-  if (type === 2 && isPackaged && webapp.pckManifest.origin) {
-    webappTargetDirName = utils.getNewURI(webapp.pckManifest.origin).host;
-  }
+  var webappTargetDirName = webapp.profileDirectoryFile.leafName;
 
   var origin = isPackaged ? 'app://' + webappTargetDirName :
                webapp.metaData.origin;
@@ -122,17 +126,17 @@ ManifestBuilder.prototype.checkOrigin = function(origin) {
 };
 
 ManifestBuilder.prototype.fillAppManifest = function(webapp) {
-  var url = webapp.url;
+  var origin = webapp.url;
 
-  var installOrigin = url;
+  var installOrigin = origin;
   if (webapp.metadata && webapp.metadata.installOrigin) {
     installOrigin = webapp.metadata.installOrigin;
   }
 
   this.stageManifests[webapp.sourceDirectoryName] = {
     originalManifest: webapp.manifest,
-    origin: url,
-    manifestURL: url + '/manifest.webapp',
+    origin: origin,
+    manifestURL: origin + '/manifest.webapp',
     installOrigin: installOrigin,
     receipt: null,
     installTime: this.INSTALL_TIME,
@@ -168,6 +172,7 @@ ManifestBuilder.prototype.execute = function(config) {
   this.gaia.webapps.forEach(this.genManifest, this);
   this.manifestErrorSummary();
   this.genStageWebappJSON();
+  this.genUuidJSON();
 };
 
 exports.execute = function(config) {

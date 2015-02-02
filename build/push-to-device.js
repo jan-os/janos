@@ -1,12 +1,23 @@
 'use strict';
 
-/* global require, exports */
+/* jshint node: true */
 
 var utils = require('./utils');
 var sh = new utils.Commander('sh');
 var Q = utils.Q;
 
 sh.initPath(utils.getEnvPath());
+
+/**
+ * detect if b2g process needs to be restarted
+ * @param  {string}  appName app name
+ * @return {bool}            true if needed
+ */
+function needsB2gRestart(appName) {
+  // b2g should be restarted if these app name is assigned by APP=appname
+  var appList = ['system', 'callscreen'];
+  return (appList.indexOf(appName) !== -1);
+}
 
 function pushToDevice(profileFolder, remotePath, adb) {
   // MingGW on Windows takes '/remote/src' as 'c:\remote\src' which is
@@ -78,7 +89,6 @@ function getRemoteInstallPath(adb) {
   var tempDirName = 'pushGaia' + Math.random().toString(36).substr(2, 8);
   var tempDir = utils.getTempFolder(tempDirName);
   var tempFile = tempDir.clone();
-  var content;
   tempFile.append('webapps.json');
 
   // Use |adb shell cat| instead of |adb pull| so we don't run into
@@ -89,6 +99,7 @@ function getRemoteInstallPath(adb) {
   // Read the file as JSON
   // If there were no webapps ever installed on the device (likely purged in
   // the previous step), default to /system/b2g
+  var content;
   try {
     content = utils.getJSON(tempFile);
   } catch (e) {
@@ -113,26 +124,17 @@ function execute(options) {
   const profileFolder = options.PROFILE_DIR;
   const gaiaDomain = options.GAIA_DOMAIN;
   var remotePath = options.GAIA_INSTALL_PARENT;
-  var pid;
-  var manifest;
-  var restartB2g = true;
 
   var mainQ = Q.defer();
   var targetFolder;
 
   var adb = options.ADB;
+  var restartB2g = needsB2gRestart(buildAppName);
 
-  if (buildAppName !== '*') {
-    targetFolder = utils.joinPath(
-        profileFolder, 'webapps',
-        buildAppName + '.' + gaiaDomain);
-    // Some app folder name is different with the process name,
-    // ex. sms -> Messages
-    manifest = utils.readZipManifest(utils.getFile(targetFolder));
-    pid = utils.getPid(manifest.name, gaiaDir);
-
-    // don't restart b2g process if we found pid by app name
-    restartB2g = (pid === -1);
+  if (restartB2g) {
+    utils.log('push-to-device', 'b2g process will be restarted for ' +
+      'installing ' + buildAppName + ' app, see bug 1000049 for ' +
+      'more information.');
   }
 
   mainQ.resolve();
@@ -148,7 +150,7 @@ function execute(options) {
     utils.log('push', 'Waiting for device ...');
     return sh.run(['-c', adb + ' wait-for-device']);
   }).then(function() {
-    if (restartB2g) {
+    if (buildAppName === '*' || restartB2g) {
       return sh.run(['-c', adb + ' shell stop b2g']);
     }
   }).then(function() {
@@ -168,6 +170,9 @@ function execute(options) {
     if (buildAppName === '*') {
       return pushToDevice(profileFolder, remotePath, adb);
     } else {
+      targetFolder = utils.joinPath(
+          profileFolder, 'webapps',
+          buildAppName + '.' + gaiaDomain);
       return installOneApp(targetFolder, buildAppName,
                            remotePath, gaiaDomain, adb);
     }
@@ -176,15 +181,33 @@ function execute(options) {
       return installSvoperapps(profileFolder, adb);
     }
   }).then(function() {
-    if (restartB2g) {
+    if (buildAppName === '*') {
+      return sh.run(['-c', adb + ' push ' +
+        '"shared/elements/gaia-icons/fonts/gaia-icons.ttf" ' +
+        '//system/fonts/hidden/gaia-icons.ttf']);
+    }
+  }).then(function() {
+    if (buildAppName === '*') {
+      return sh.run(['-c', adb + ' push ' +
+        '"shared/style/keyboard_symbols/Keyboard-Symbols.ttf" ' +
+        '//system/fonts/hidden/Keyboard-Symbols.ttf']);
+    }
+  }).then(function() {
+    if (buildAppName === '*' || restartB2g) {
       utils.log('push', 'Restarting B2G...');
       sh.run(['-c', adb + ' shell start b2g']);
     } else {
       var Q3 = Q.defer();
+      var manifest;
       Q3.resolve();
       return Q3.promise.then(function() {
+      // Some app folder name is different with the process name,
+      // ex. sms -> Messages
+        manifest = utils.readZipManifest(utils.getFile(
+                        targetFolder));
+      }).then(function() {
         utils.log('push', 'Restarting ' + manifest.name + '...');
-        utils.killAppByPid(pid);
+        utils.killAppByPid(manifest.name, gaiaDir);
       });
     }
   });

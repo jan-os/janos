@@ -19,9 +19,7 @@ WebappZip.prototype.setOptions = function(options) {
   this.webapp = options.webapp;
   this.buildDir = this.webapp.buildDirectoryFile;
 
-  var targetDir = options.targetDir;
-  var targetAppFolder = targetDir.clone();
-  targetAppFolder.append(this.webapp.domain);
+  var targetAppFolder = this.webapp.profileDirectoryFile;
   utils.ensureFolderExists(targetAppFolder);
 
   var zipContent = targetAppFolder.clone();
@@ -50,7 +48,7 @@ WebappZip.prototype.getCompression = function(pathInZip) {
 
 WebappZip.prototype.isExcludedFromZip = function(file) {
   try {
-    if (!file || !file.isFile()) {
+    if (!(file && file.exists() && file.isFile())) {
       return true;
     }
   } catch (e) {
@@ -61,6 +59,43 @@ WebappZip.prototype.isExcludedFromZip = function(file) {
   var excludedFuncs = [
     function fileExist(file) {
       return !file.exists();
+    },
+    function isLocales(file) {
+      return self.config.GAIA_CONCAT_LOCALES === '1' &&
+        /locales[^-]/.test(file.path);
+    },
+    function isSpecificProperties(file) {
+      var options = self.config;
+      if(utils.getExtension(file.path) === 'properties' &&
+        file.path.indexOf('locales') !== -1 &&
+        options.GAIA_CONCAT_LOCALES === '0' &&
+        options.LOCALE_BASEDIR && options.LOCALES_FILE) {
+        let localesFile = utils.resolve(options.LOCALES_FILE, options.GAIA_DIR);
+        if (!localesFile.exists()) {
+          throw new Error('file not found: ' + localesFile.path);
+        }
+        let locales = Object.keys(utils.getJSON(localesFile));
+
+        return !locales.some(function(locale) {
+          return file.path.indexOf(locale + '.properties') !== -1;
+        });
+      }
+      return false;
+    },
+    function isBuild(file) {
+      var appDirPath = self.webapp.sourceDirectoryName;
+      return new RegExp(utils.joinPath(appDirPath, 'build')
+        .replace(/\\/g, '\\\\') + '|build.txt')
+        .test(file.path);
+    },
+    function isMakefile(file) {
+      return /Makefile/.test(file.path);
+    },
+    function isReadme(file) {
+      return /README/.test(file.path);
+    },
+    function isPackageJSON(file) {
+      return /package\.json/.test(file.path);
     },
     function fileHidden(file) {
       return file.isHidden();
@@ -77,8 +112,7 @@ WebappZip.prototype.isExcludedFromZip = function(file) {
     },
     function isL10n(file) {
       return (self.config.GAIA_CONCAT_LOCALES === '1' &&
-        (file.leafName === 'locales' || file.leafName === 'locales.ini' ||
-         file.parent.leafName === 'locales'));
+        (file.leafName === 'locales' || file.parent.leafName === 'locales'));
     },
     function isConcatenatedL10n(file) {
       return ((file.leafName === 'locales-obj' ||
@@ -168,20 +202,16 @@ WebappZip.prototype.execute = function(options) {
   this.closeZip();
 };
 
-function execute(config) {
-  var webappsTargetDir = utils.getFile(config.PROFILE_DIR);
-  // Create profile folder if doesn't exists
-  utils.ensureFolderExists(webappsTargetDir);
+function execute(options, webapp) {
+  var profileDir = utils.getFile(options.PROFILE_DIR);
+  utils.ensureFolderExists(profileDir);
+  profileDir.append('webapps');
+  utils.ensureFolderExists(profileDir);
 
-  // Create webapps folder if doesn't exists
-  webappsTargetDir.append('webapps');
-
-  var gaia = utils.gaia.getInstance(config);
-  gaia.webapps.forEach(function(webapp) {
-    (new WebappZip()).execute({
-      config: config, targetDir: webappsTargetDir, webapp: webapp});
+  (new WebappZip()).execute({
+    config: options,
+    webapp: webapp
   });
-
 }
 
 exports.execute = execute;

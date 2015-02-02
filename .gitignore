@@ -37,6 +37,7 @@ manifest.appcache
 /shared/pages/import/js/parameters.js
 
 /b2g
+/b2g_sdk
 /profile/
 /profile-debug/
 /profile-test/

@@ -1,6 +1,5 @@
 apps/bluetooth
 apps/bookmark
-apps/browser
 apps/calendar
 apps/callscreen
 apps/camera
@@ -8,6 +7,8 @@ apps/clock
 apps/collection
 apps/communications
 apps/costcontrol
+apps/default_theme
+apps/download
 apps/email
 apps/emergency-call
 apps/findmydevice
@@ -15,10 +16,10 @@ apps/fl
 apps/fm
 apps/ftu
 apps/gallery
-apps/homescreen
 apps/keyboard
 apps/marketplace.firefox.com
 apps/music
+apps/network-alerts
 apps/operatorvariant
 apps/pdfjs
 apps/ringtones
@@ -32,3 +33,4 @@ apps/video
 apps/wallpaper
 apps/wappush
 outoftree_apps/*
+apps/privacy-panel

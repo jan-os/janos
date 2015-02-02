@@ -298,7 +298,7 @@ function startWifi(options) {
   function enableWifi(network, password) {
     if (network) options.network = network;
     if (password) options.password = password;
-    
+
     options.enabled = true;
     navigator.mozSettings.createLock().set({ 'wifi.enabled': true });
   }
