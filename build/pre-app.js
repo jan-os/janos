@@ -17,6 +17,8 @@ function execute(options) {
 
   require('./contacts-import-services').execute(options);
 
+  require('./preferences').execute(options);
+
   if (options.BUILD_APP_NAME == '*') {
     require('./settings').execute(options);
   }

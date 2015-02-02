@@ -1,6 +1,6 @@
 /* globals LazyLoader, ConfirmDialog, utils, contacts, oauthflow,
   Curtain, ImageLoader, importer, asyncStorage, FriendListRenderer,
-  Rest, oauth2, contactsList*/
+  Rest, oauth2, contactsList, ImportStatusData */
 'use strict';
 
 if (typeof window.importer === 'undefined') {
@@ -50,8 +50,6 @@ if (typeof window.importer === 'undefined') {
 
     var cancelled = false;
 
-    var _ = navigator.mozL10n.get;
-
     // Indicates whether some friends have been imported or not
     var friendsImported;
 
@@ -86,8 +84,8 @@ if (typeof window.importer === 'undefined') {
       parent.postMessage({
         type: message.type || '',
         data: message.data || '',
-        message: message.message || '',
-        additionalMessage: message.additionalMessage || ''
+        messageId: message.messageId,
+        additionalMessageId: message.additionalMessageId
       }, origin);
     }
 
@@ -97,9 +95,9 @@ if (typeof window.importer === 'undefined') {
       parent.LazyLoader.load(dialog, function() {
         LazyLoader.load('/shared/js/confirm.js',
           function() {
-          ConfirmDialog.show(_('connectionLost'), _('connectionLostMsg'),
+          ConfirmDialog.show('connectionLost', 'connectionLostMsg',
           {
-            title: _('noOption'),
+            title: 'noOption',
             isRecommend: !recommend,
             callback: function() {
               ConfirmDialog.hide();
@@ -107,7 +105,7 @@ if (typeof window.importer === 'undefined') {
             }
           },
           {
-            title: _('yesOption'),
+            title: 'yesOption',
             // FB friends can later resync data
             isRecommend: recommend,
             callback: function() {
@@ -230,7 +228,7 @@ if (typeof window.importer === 'undefined') {
 
     function removeToken(cb) {
       var theCb = (typeof cb === 'function') ? cb : function() {};
-      window.asyncStorage.removeItem(tokenKey, theCb, theCb);
+      ImportStatusData.remove(tokenKey).then(theCb, theCb);
     }
 
     function markPendingLogout(url, service, cb) {
@@ -457,8 +455,8 @@ if (typeof window.importer === 'undefined') {
      *
      */
     function markExisting(deviceFriends) {
-      updateButton.textContent = deviceFriends.length === 0 ? _('import') :
-                                                              _('update');
+      updateButton.setAttribute('data-l10n-id',
+        deviceFriends.length === 0 ? 'import' : 'update');
       var reallyExisting = 0;
 
       deviceFriends.forEach(function(fbContact) {
@@ -482,13 +480,15 @@ if (typeof window.importer === 'undefined') {
       });
 
       if (myFriends.length < 1) {
-        friendsMsgElement.textContent = _('fbNoFriends');
+        friendsMsgElement.setAttribute('data-l10n-id', 'fbNoFriends');
       } else {
         var newValue = myFriends.length -
                           Object.keys(existingContactsByUid).length;
-        friendsMsgElement.textContent = _('fbFriendsFound', {
-          numFriends: newValue
-        });
+        navigator.mozL10n.setAttributes(
+          friendsMsgElement,
+          'fbFriendsFound',
+          { numFriends: newValue < 0 ? 0 : newValue }
+        );
       }
 
       checkDisabledButtons();
@@ -540,6 +540,13 @@ if (typeof window.importer === 'undefined') {
     Importer.friendsReady = function(response) {
       if (typeof response.error === 'undefined') {
         var lmyFriends = response.data;
+
+        if (lmyFriends.length === 0) {
+          showNoFriends(function() {
+            Curtain.hide(UI.end);
+          });
+          return;
+        }
         // Notifying the connector
         if (typeof serviceConnector.oncontactsloaded === 'function') {
           serviceConnector.oncontactsloaded(lmyFriends);
@@ -580,16 +587,43 @@ if (typeof window.importer === 'undefined') {
           Curtain.hide(notifyParent.bind(null, {
             type: 'token_error'
           }, targetApp));
-          window.asyncStorage.removeItem(tokenKey,
-            function token_removed() {
-              oauth2.getAccessToken(function(new_acc_tk) {
-                access_token = new_acc_tk;
-                Importer.getFriends(new_acc_tk);
-              }, 'friends', serviceConnector.name);
+          ImportStatusData.remove(tokenKey).then(function token_removed() {
+            oauth2.getAccessToken(function(new_acc_tk) {
+              access_token = new_acc_tk;
+              Importer.getFriends(new_acc_tk);
+            }, 'friends', serviceConnector.name);
           });
         } // else
       } // else
     };
+
+    function showNoFriends(callback) {
+      var dialog = parent.document.getElementById('confirmation-message');
+      parent.LazyLoader.load(dialog, function() {
+        LazyLoader.load('/shared/js/confirm.js', function() {
+          ConfirmDialog.show(null, 'emptyAccount',
+          {
+            title: 'ok',
+            isRecommend: true,
+            callback: function() {
+              ConfirmDialog.hide();
+              if(typeof callback === 'function') {
+                callback();
+              }
+            }
+          },
+          null,
+          {
+            zIndex: '10000'
+          });
+          
+          // Only for unit testing purposes
+          if (typeof startCallback === 'function') {
+            window.setTimeout(startCallback, 0);
+          }
+        });
+      }); 
+    }
 
     function cancelImport() {
       cancelled = true;
@@ -697,13 +731,15 @@ if (typeof window.importer === 'undefined') {
       if (Importer.getContext() === 'ftu') {
         Curtain.hide(notifyParent.bind(null, {
           type: 'window_close',
-          message: cancelled ? null : _('friendsUpdated', {
-            numFriends: numFriends
-          }),
-          additionalMessage: (cancelled || !numMergedDuplicated) ?
-                              null : _('friendsMerged', {
-            numDups: numMergedDuplicated
-          })
+          messageId: cancelled ? null : {
+            id: 'friendsUpdated',
+            args: { numFriends: numFriends }
+          },
+          additionalMessageId: (cancelled || !numMergedDuplicated) ?
+                              null : {
+            id: 'friendsMerged',
+            args: { numDups: numMergedDuplicated }
+          }
         }, targetApp));
       } else {
           notifyParent({
@@ -717,18 +753,20 @@ if (typeof window.importer === 'undefined') {
             if (e.data.type === 'contacts_loaded') {
               // When the list of contacts is loaded and it's the current view
 
-              var message = cancelled ? null : _('friendsUpdated', {
-                numFriends: numFriends
-              });
-              var additionalMessage = (cancelled || !numMergedDuplicated) ?
-                null : _('friendsMerged', {
-                  numDups: numMergedDuplicated
-              });
+              var messageId = cancelled ? null : {
+                id: 'friendsUpdated',
+                args: { numFriends: numFriends }
+              };
+              var additionalMessageId = (cancelled || !numMergedDuplicated) ?
+                null : {
+                id: 'friendsMerged',
+                args: { numDups: numMergedDuplicated }
+              };
 
               Curtain.hide(notifyParent.bind(null, {
                 type: 'window_close',
-                message: message,
-                additionalMessage: additionalMessage
+                messageId: messageId,
+                additionalMessageId: additionalMessageId
               }, targetApp));
 
               window.removeEventListener('message', finished);
@@ -989,8 +1027,9 @@ if (typeof window.importer === 'undefined') {
       theImporter.onsuccess = function(totalImported, totalMerged) {
         ongoingImport = false;
         window.setTimeout(function imported() {
-          utils.misc.setTimestamp(serviceConnector.name);
-          importedCB(totalImported, totalMerged);
+          utils.misc.setTimestamp(serviceConnector.name, () => {
+            importedCB(totalImported, totalMerged);
+          });
         }, 0);
 
         if (cpuLock) {

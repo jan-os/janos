@@ -1,4 +1,4 @@
-/* global Contacts, _, VCFReader, ConfirmDialog */
+/* global Contacts, VCardReader, ConfirmDialog, contacts, LazyLoader */
 'use strict';
 
 var utils = window.utils || {};
@@ -9,13 +9,25 @@ var utils = window.utils || {};
  * Passes the id of last imported contact in the callback
  */
 utils.importFromVcard = function(file, callback) {
-  Contacts.utility('Overlay', function _loaded() {
+
+  var MERGE_DEPENDENCIES = [
+    '/shared/js/simple_phone_matcher.js',
+    '/shared/js/contacts/merger_adapter.js',
+    '/shared/js/contacts/contacts_merger.js',
+    '/shared/js/contacts/contacts_matcher.js'
+  ];
+
+  Contacts.utility('Overlay', function() {
+    LazyLoader.load(MERGE_DEPENDENCIES, _loaded);
+  }, Contacts.SHARED_UTILITIES);
+
+  function _loaded() {
     var importedContacts = 0;
     var cancelled = false;
     var importer = null;
     var text = null;
     var progress = utils.overlay.show(
-                   _('memoryCardContacts-reading'),
+                   'memoryCardContacts-reading',
                    'activityBar'
                  );
 
@@ -29,57 +41,115 @@ utils.importFromVcard = function(file, callback) {
       }
     };
 
-    var reader = new FileReader();
-    reader.onloadend = function() {
-      text = reader.result;
-      if (text) {
-        processTextFromFile(text);
+    readVCard(function(vcardText) {
+      if (vcardText) {
+        processTextFromFile(vcardText);
+      } else {
+        callback();
       }
-    };
+    });
 
-    try {
-      reader.readAsText(file);
-    }
-    catch (ex) {
-      console.error('Error reading the file ' + ex.message);
-      callback();
+    function readVCard(cb) {
+      var reader;
+
+      if (typeof file === 'string') {
+        cb(file);
+      } else {
+        reader = new FileReader();
+        reader.onloadend = function() {
+          text = reader.result;
+          if (text) {
+            cb(text);
+          }
+        };
+
+        try {
+          reader.readAsText(file);
+        }
+        catch (ex) {
+          console.error('Error reading the file ' + ex.message);
+          import_error();
+          cb();
+        }
+      }
     }
 
     function processTextFromFile(textFromFile) {
       if (cancelled) {
         return;
       }
-      importer = new VCFReader(textFromFile);
-      if (!textFromFile || !importer) {
-        return;// No contacts were found.
-      }
 
-      importer.onread = import_read;
-      importer.onimported = imported_contact;
-      importer.onerror = import_error;
-      importer.process(function import_finish(result, numDupsMerged) {
-        utils.overlay.hide();
+      var reader = new VCardReader(textFromFile);
+      var match = textFromFile && textFromFile.match(/END:VCARD/g);
+      var cursor = reader.getAll();
+      var numContacts = match ? match.length : 0;
+      var numDupsMerged = 0;
+      var firstContact = null;
+
+      var _doContinue = function(savedContact) {
+        if (savedContact) {
+          if (!firstContact) {
+            firstContact = savedContact;
+          }
+          imported_contact();
+        }
         if (!cancelled) {
-          var msg1 = _('memoryCardContacts-imported3', {
-            n: importedContacts
-          });
-          var msg2 = !numDupsMerged ? null : _('contactsMerged', {
-            numDups: numDupsMerged
-          });
-          utils.status.show(msg1,msg2);
+          cursor.continue();
         }
+      };
 
-        if (result && result.length) {
-          callback(result.length, result[0].id);
+      cursor.onsuccess = function(evt) {
+        if (evt.target.result) {
+          var contact = evt.target.result;
+
+          contacts.Matcher.match(contact, 'passive', {
+            onmatch: function(matches) {
+              var callbacks = {
+                success: function(mergedContact) {
+                  numDupsMerged++;
+                  _doContinue(mergedContact);
+                },
+                error: _doContinue
+              };
+              contacts.adaptAndMerge(contact, matches, callbacks);
+            },
+            onmismatch: function() {
+              var req = navigator.mozContacts.save(contact);
+              req.onsuccess = function() {
+                _doContinue(contact);
+              };
+            }
+          });
+
+        // No more contacts
         } else {
-          callback();
+          utils.overlay.hide();
+          if (!cancelled) {
+            var msgImported = {
+              id: 'memoryCardContacts-imported3',
+              args: {n: importedContacts}
+            };
+            var msgDupsMerged = numDupsMerged ? {
+              id: 'contactsMerged',
+              args: {numDups: numDupsMerged}
+            } : null;
+
+            utils.status.show(msgImported, msgDupsMerged);
+          }
+          if (importedContacts > 0) {
+            callback(importedContacts, firstContact.id);
+          } else {
+            callback(importedContacts);
+          }
         }
-      });
+      };
+
+      import_read(numContacts);
     }
 
     function import_read(n) {
       progress.setClass('progressBar');
-      progress.setHeaderMsg(_('memoryCardContacts-importing'));
+      progress.setHeaderMsg('memoryCardContacts-importing');
       progress.setTotal(n);
     }
 
@@ -94,14 +164,14 @@ utils.importFromVcard = function(file, callback) {
       console.error('Error importing from vcard: ' + e.message);
       // Showing error message allowing user to retry
       var cancel = {
-        title: _('cancel'),
+        title: 'cancel',
         callback: function() {
           ConfirmDialog.hide();
         }
       };
 
       var retry = {
-        title: _('retry'),
+        title: 'retry',
         isRecommend: true,
         callback: function() {
           ConfirmDialog.hide();
@@ -109,9 +179,9 @@ utils.importFromVcard = function(file, callback) {
           processTextFromFile(text);
         }
       };
-      Contacts.confirmDialog(null, _('memoryCardContacts-error'),
+      Contacts.confirmDialog(null, 'memoryCardContacts-error',
                              cancel, retry);
       utils.overlay.hide();
     }
-  }, Contacts.SHARED_UTILITIES);
+  }
 };

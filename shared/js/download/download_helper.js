@@ -249,6 +249,34 @@ var DownloadHelper = (function() {
     }
   };
 
+  /*
+   * This action gets the info for a download
+   *
+   * @param{Object} Configuration parameters
+   */
+  var InfoAction = function InfoAction(params) {
+    Action.call(this, params);
+
+    this.data = {
+      name: DownloadFormatter.getFileName(params.download),
+      type: params.type,
+      blob: params.blob,
+      size: params.download.totalBytes,
+      path: params.download.path
+    };
+  };
+
+  InfoAction.prototype = {
+    __proto__: Action.prototype,
+
+    /*
+     * It overrides the generic run method
+     */
+    run: function ia_run() {
+      this.req.done(this.data);
+    }
+  };
+
   // This is a factory that deals with different <Action> objects
   var ActionsFactory = {
     TYPE: {
@@ -259,6 +287,9 @@ var DownloadHelper = (function() {
       SHARE: {
         activityName: 'share',
         actionClass: ShareAction
+      },
+      INFO: {
+        actionClass: InfoAction
       },
       WALLPAPER: {
         activityName: 'setwallpaper',
@@ -302,7 +333,7 @@ var DownloadHelper = (function() {
 
     window.setTimeout(function launching() {
       var state = download.state;
-      if (state === 'succeeded') {
+      if (state === 'succeeded' || state === 'finalized') {
         LazyLoader.load(['shared/js/mime_mapper.js',
                          'shared/js/download/download_formatter.js'],
                         function loaded() {
@@ -320,7 +351,8 @@ var DownloadHelper = (function() {
           if (type.length === 0) {
             type = download.contentType;
 
-            if (actionType !== ActionsFactory.TYPE.OPEN) {
+            if (actionType !== ActionsFactory.TYPE.OPEN &&
+                actionType !== ActionsFactory.TYPE.INFO) {
               sendError(req, 'Mime type not supported: ' + type,
                         CODE.MIME_TYPE_NOT_SUPPORTED);
               return;
@@ -355,7 +387,7 @@ var DownloadHelper = (function() {
   }
 
   /*
-   * This method allows clients to remove a downlaod, from the
+   * This method allows clients to remove a download, from the
    * list and the phone.
    *
    * @param{Object} It represents a DOMDownload object
@@ -370,13 +402,27 @@ var DownloadHelper = (function() {
         if (!navigator.mozDownloadManager) {
           sendError(req, 'DownloadManager not present', CODE.INVALID_STATE);
         } else {
-          navigator.mozDownloadManager.remove(download).then(
-            function success() {
-              req.done(download);
+          // First we pause the download so that everyone knows it's being
+          // stopped. The Downloads API itself won't stop the download first,
+          // it will simply kill it.
+          // XXXAus: Remove when we fix bug #1090551
+          download.pause().then(
+            function() {
+              navigator.mozDownloadManager.remove(download).then(
+                function success() {
+                  req.done(download);
+                },
+                function error() {
+                  sendError(req,
+                            'DownloadManager doesnt know about this download',
+                            CODE.INVALID_STATE);
+                }
+              );
             },
-            function error() {
-              sendError(req, 'DownloadManager doesnt know about this download',
-                CODE.INVALID_STATE);
+            function() {
+              sendError(req,
+                        'Failed to pause download before removal',
+                        CODE.INVALID_STATE);
             }
           );
         }
@@ -578,6 +624,15 @@ var DownloadHelper = (function() {
     */
     ringtone: function(download) {
       return runAction(ActionsFactory.TYPE.RINGTONE, download);
+    },
+
+   /*
+    * This method returns information about a download
+    *
+    * @param{Object} It represents a DOMDownload object
+    */
+    info: function(download) {
+      return runAction(ActionsFactory.TYPE.INFO, download);
     },
 
     /*

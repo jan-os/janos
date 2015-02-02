@@ -55,29 +55,7 @@ var HTMLOptimizer = function(options) {
 };
 
 HTMLOptimizer.prototype.process = function() {
-  var mozL10n = this.win.navigator.mozL10n;
-  this.mockWinObj();
-
-  this.getDictionary = mozL10n.getDictionary.bind(mozL10n);
-
-  var ignore = this.optimizeConfig.L10N_OPTIMIZATION_BLACKLIST;
-  // If this HTML document uses l10n.js, pre-localize it --
-  //   note: a document can use l10n.js by including either l10n.js or
-  //   application/l10n resource link elements (see /shared/js/lazy_l10n.js).
-  if ((!this.win.document.querySelector('script[src$="l10n.js"]') &&
-       !this.win.document.querySelector('link[type$="application/l10n"]')) ||
-      ignore[this.webapp.sourceDirectoryName]) {
-    this.done(this.files);
-    return;
-  }
-
-  // Since l10n.js was read before the document was created, we need to
-  // explicitly initialize it again via mozL10n.bootstrap, which looks for
-  // *.ini links in the HTML and sets up the localization context.
-  mozL10n.bootstrap(this._optimize.bind(this),
-    // if LOCALE_BASEDIR is set, we're going to show missing strings at
-    // buildtime.
-    this.config.LOCALE_BASEDIR !== '');
+  this.done(this.files);
 };
 
 HTMLOptimizer.prototype._optimize = function() {
@@ -751,9 +729,6 @@ function execute(config) {
     dispatchEvent: function() {},
     console: {}
   };
-
-  // Load window object from build/l10n.js and shared/js/l10n.js into win;
-  win = loadL10nScript(config, win);
 
   var optimizeConfig = loadOptimizeConfig(config);
 

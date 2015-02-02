@@ -14,15 +14,6 @@
     var w = device.screen.width;
     var h = device.screen.height;
 
-    var lat;
-    var lon;
-    var position = device.position;
-
-    if (position && position.coords) {
-      lat = position.coords.latitude;
-      lon = position.coords.longitude;
-    }
-
     // default to undefined's so that JSON.stringify will drop them
     return {
       lc: device.language || undefined,
@@ -33,9 +24,7 @@
       ct: device.dataConnectionType || undefined,
       mcc: device.mcc || undefined,
       mnc: device.mnc || undefined,
-      sr: (w && h) ? [w, h].join('x') : undefined,
-      ll: (lat && lon) ? [lat,lon].join(',') : undefined
-      // TODO hc: home country
+      sr: (w && h) ? [w, h].join('x') : undefined
     };
 
   }
@@ -46,6 +35,13 @@
    * respectively
    */
   function Request(service, method, options) {
+
+    if (!eme.config.apiUrl) {
+      return new Promise(function(resolve, reject) {
+        reject('eme.config.apiUrl not defined');
+      });
+    }
+
     var resource = service + '/' + method;
     var url = eme.config.apiUrl.replace('{resource}', resource);
     var payload = '';
@@ -110,31 +106,20 @@
     return promise;
   }
 
-  /** Make a Request and
-   *  1. cache the response
-   *  2. if offline, get response from cache
-   */
-  function CacheableRequest(service, method, options) {
-    return new Promise(function done(resolve, reject) {
-      if (navigator.onLine) {
-        Request(service, method, options).then(
-          function success(response) {
-            eme.Cache.addRequest(service, method, options, response);
-            resolve(response);
-          }, reject)
-        .catch();
+  function SanitizeAppSearch(result) {
+    return new Promise(function(resolve, reject) {
+      // Sanitize app URLs returned from e.me
+      var apps = result.response.apps;
+      if (apps.length) {
+        var a = document.createElement('a');
+        for (var i = 0, iLen = apps.length; i < iLen; i++) {
+          a.href = apps[i].appUrl;
+          apps[i].appUrl = a.href;
+        }
       }
-      else {
-        eme.Cache.getRequest(service, method, options)
-          .then(function success(cachedResponse) {
-            eme.log('using cached response:', service + '/' + method);
-            resolve(cachedResponse);
-          }, reject.bind(null, NETWORK_ERROR))
-          .catch(reject);
-      }
+      resolve(result);
     });
   }
-
 
   function PartnersAPI() {
 
@@ -158,7 +143,7 @@
 
         options.iconFormat = ICON_FORMAT;
 
-        return Request('Apps', 'search', options);
+        return Request('Apps', 'search', options).then(SanitizeAppSearch);
       }
     };
 
@@ -177,9 +162,28 @@
       }
     };
 
+    /** Make a Request and
+     *  1. on success: cache the response
+     *  2. on error: get response from cache
+     *  2.1 on error: reject with NETWORK_ERROR
+     */
     this.Categories = {
       list: function list(options) {
-        return CacheableRequest('Categories', 'list', options);
+        var request = Request('Categories', 'list', options);
+
+        return request.then(
+          response => {
+            eme.Cache.addRequest('Categories', 'list', options, response);
+            return response;
+          },
+          () => {
+            return eme.Cache.getRequest('Categories', 'list', options)
+                      .then(response => {
+                        eme.log('using cached response (Categories/list)');
+                        return response;
+                      })
+                      .catch(() => Promise.reject(NETWORK_ERROR));
+          });
       }
     };
   }

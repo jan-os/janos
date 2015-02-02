@@ -1,6 +1,6 @@
 'use strict';
 
-/* global oauthflow, utils */
+/* global ImportStatusData, oauthflow, utils */
 /* Ignoring function declaration in loops */
 /* jshint -W083 */
 
@@ -16,6 +16,7 @@ window.fb = fb;
     var CACHE_FRIENDS_KEY = Utils.CACHE_FRIENDS_KEY = 'numFacebookFriends';
     var LAST_UPDATED_KEY = Utils.LAST_UPDATED_KEY = 'lastUpdatedTime';
     Utils.ALARM_ID_KEY = 'nextAlarmId';
+    Utils.SCHEDULE_SYNC_KEY = 'facebookShouldHaveScheduledAt';
 
     var REDIRECT_LOGOUT_URI = window.oauthflow ?
       oauthflow.params.facebook.redirectLogout : '';
@@ -38,6 +39,14 @@ window.fb = fb;
           callback(out);
         }
       });
+    };
+
+    Utils.getNonCacheableUrl = function(url) {
+      if (url.indexOf('?') === -1) {
+        url += '?';
+      }
+
+      return url + '&burst_cache=' + Date.now();
     };
 
 
@@ -159,7 +168,7 @@ window.fb = fb;
     };
 
     Utils.getCachedAccessToken = function(callback) {
-      window.asyncStorage.getItem(STORAGE_KEY, function(data) {
+      ImportStatusData.get(STORAGE_KEY).then(function(data) {
         var out = null;
 
         if (data) {
@@ -174,7 +183,7 @@ window.fb = fb;
     };
 
     Utils.setCachedAccessToken = function(data, callback) {
-      window.asyncStorage.setItem(STORAGE_KEY, data, function done() {
+      ImportStatusData.put(STORAGE_KEY, data).then(function done() {
         if (typeof callback === 'function') {
           callback();
         }
@@ -188,7 +197,7 @@ window.fb = fb;
 
     // Obtains the number locally
     Utils.getCachedNumFbFriends = function(callback) {
-      window.asyncStorage.getItem(CACHE_FRIENDS_KEY, function(data) {
+      ImportStatusData.get(CACHE_FRIENDS_KEY).then(function(data) {
         if (typeof callback === 'function' && typeof data === 'number') {
           callback(data);
         }
@@ -196,9 +205,15 @@ window.fb = fb;
     };
 
     Utils.setCachedNumFriends = function(value, cb) {
-      window.asyncStorage.setItem(CACHE_FRIENDS_KEY, value, cb);
+      ImportStatusData.put(CACHE_FRIENDS_KEY, value).then(cb);
     };
 
+    // Removes cached number of friends from datastore to keep state of sync.
+    Utils.removeCachedNumFriends = function(callback) {
+      ImportStatusData.remove(CACHE_FRIENDS_KEY).then(function() {
+        typeof callback === 'function' && callback();
+      });
+    };
 
     Utils.getImportChecked = function(callback) {
       // If we have an access token Import should be checked
@@ -299,6 +314,12 @@ window.fb = fb;
     Utils.logout = function() {
       var outReq = new Utils.Request();
 
+      // Duration of the timer that checks window close by the user (1/2 sec)
+      var WINDOW_TIMER_INTERVAL = 500;
+      // Maximum time we are going to wait for a logout operation (5 secs)
+      var LOGOUT_TIMEOUT = 5000;
+      var MAX_TIMER_TICKS = LOGOUT_TIMEOUT / WINDOW_TIMER_INTERVAL;
+
       window.setTimeout(function do_logout() {
         Utils.getCachedAccessToken(function getAccessToken(access_token) {
           if (access_token) {
@@ -310,13 +331,15 @@ window.fb = fb;
 
             var logoutParams = params.join('&');
             var logoutUrl = logoutService + logoutParams;
+            var loggedOut = false;
 
             var m_listen = function(e) {
               if (e.origin !== fb.CONTACTS_APP_ORIGIN) {
                 return;
               }
               if (e.data === 'closed') {
-                window.asyncStorage.removeItem(STORAGE_KEY);
+                loggedOut = true;
+                ImportStatusData.remove(STORAGE_KEY);
                 outReq.done();
               }
               e.stopImmediatePropagation();
@@ -325,7 +348,28 @@ window.fb = fb;
 
             window.addEventListener('message', m_listen);
 
-            window.open(logoutUrl, '', 'dialog');
+            var logoutWindow = window.open(logoutUrl, '', 'dialog');
+            // This timer is run in order to monitor whether the window is
+            // closed by the user during the logout process (bug 1084224).
+            // This will have to be removed once bug 966216 is fixed
+            var timerTicks = 0;
+            var timerId = window.setInterval(function() {
+              timerTicks++;
+              var closed = (logoutWindow.closed === true);
+              var timedOut = (timerTicks >= MAX_TIMER_TICKS);
+
+              if (loggedOut || closed || timedOut) {
+                window.clearInterval(timerId);
+                window.removeEventListener('message', m_listen);
+              }
+
+              if (closed && !loggedOut) {
+                outReq.failed('UserCancelled');
+              }
+              else if (timedOut && !loggedOut) {
+                outReq.failed('Timeout');
+              }
+            }, WINDOW_TIMER_INTERVAL);
           } // if
           else {
             outReq.done();
@@ -411,8 +455,17 @@ window.fb = fb;
           var number = idx;
           var req, fbContact;
           if (fb.isFbLinked(contact)) {
-            fbContact = new fb.Contact(contact);
-            req = fbContact.unlink('hard');
+            if (mustUpdate) {
+              fbContact = new fb.Contact(contact);
+              req = fbContact.unlink('hard');
+            }
+            else {
+              // Here we only need to mark this contact as unlinked
+              // as the FB Data would have been already removed
+              fb.unlinkClearAll(contact);
+              req = navigator.mozContacts.save(
+                                              utils.misc.toMozContact(contact));
+            }
           }
           else {
             if (mustUpdate) {

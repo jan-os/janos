@@ -27,24 +27,49 @@ utils.status = (function() {
     statusMsg.addEventListener('transitionend', hideAnimationDone);
     statusMsg.classList.remove('opening');
     statusMsg.classList.remove('bannerStart');
+    statusMsg.querySelector('p').removeAttribute('data-l10n-id');
     if (additionalLine) {
       statusMsg.removeChild(additionalLine);
       additionalLine = null;
     }
   };
 
-  var showStatus = function(text, additional) {
+  var setL10nAttributes = function(node, l10n) {
+    if (l10n && l10n.id) {
+      navigator.mozL10n.setAttributes(node, l10n.id, l10n.args);
+      return true;
+    } else {
+      console.error('Status arguments must be objects');
+      return false;
+    }
+  };
+
+  /**
+   * Fills the DOM with the proper content and makes it visible
+   * As parameters, it consums objects of the form
+   * {
+   *    id: id,
+   *    args: args
+   * }
+   * @param mainMessage: the message to display
+   * @param extra: an optional extra line for the message
+   */
+  var showStatus = function(mainMessage, extra) {
     // clean listeners in case of previous race conditions
     statusMsg.removeEventListener('transitionend', showAnimationDone);
     statusMsg.removeEventListener('transitionend', hideAnimationDone);
 
     LazyLoader.load([statusMsg], function _loaded() {
-      statusMsg.querySelector('p').textContent = text;
+      // if parameters correct keep going
+      if (!setL10nAttributes(statusMsg.querySelector('p'), mainMessage)) {
+        return;
+      }
 
-      if (additional) {
+      // check for additional messages
+      if (extra) {
         additionalLine = document.createElement('p');
         statusMsg.appendChild(additionalLine);
-        additionalLine.textContent = additional;
+        setL10nAttributes(additionalLine, extra);
       }
 
       // If showing already, we increase the time after the change

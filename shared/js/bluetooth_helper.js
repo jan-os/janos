@@ -15,6 +15,7 @@ var BluetoothHelper = function() {
   var _callbacks = [];
 
   var _adapter = null;
+  var _v2 = true;
 
   var _ready = function(callback) {
     if (!callback || !_bluetooth) {
@@ -43,26 +44,104 @@ var BluetoothHelper = function() {
     };
   };
 
-  var _getAdapter = function() {
-    var req = _bluetooth.getDefaultAdapter();
-    req.onsuccess = function() {
+  // run callbacks when adapter is ready
+  var _processCallbacks = function() {
+    if (_adapter) {
       _isReady = true;
-      _adapter = req.result;
 
       _callbacks.forEach(function(callback) {
         callback();
       });
-    };
-
-    req.onerror = function() {
+      // clean up the _callback queue
+      _callbacks = [];
+    } else {
       // We can do nothing without default adapter.
-      console.log('BluetoothHelper(): connot get default adapter!!!');
-    };
+      console.log('BluetoothHelper(): connot get default adapter yet');
+    }
   };
 
+  // API v2 get adapter via bluetooth
+  var _fetchAdapterV2 = function() {
+    // need time to get bluetooth adapter at first run
+    _bluetooth.onattributechanged = function onManagerAttributeChanged(evt) {
+      for (var i in evt.attrs) {
+        switch (evt.attrs[i]) {
+          case 'defaultAdapter':
+            console.log('defaultAdapter changed. address:',
+              _bluetooth.defaultAdapter.address);
+            _adapter = _bluetooth.defaultAdapter;
+            _processCallbacks();
+            break;
+          default:
+            break;
+        }
+      }
+    };
+
+    _adapter = _bluetooth.defaultAdapter;
+    if (_adapter) {
+      _processCallbacks();
+    }
+  };
+
+  // API v1 get adapter via bluetooth
+  var _fetchAdapter = function() {
+    var req = _bluetooth.getDefaultAdapter();
+    if (req) {
+      req.onsuccess = function() {
+        var _oldAdapter;
+        if (_adapter) {
+          _oldAdapter = _adapter;
+        }
+
+        _isReady = true;
+        _adapter = req.result;
+
+        // Put the callback function of onpairedstatuschanged to the new adapter
+        // because the new adapter won't remember those callback function which
+        // is registered before. In other word, we get a new adpater after
+        // turned on/off Bluetooth. The new adapter have no registered callback.
+        if (_oldAdapter && _oldAdapter.onpairedstatuschanged) {
+          _adapter.onpairedstatuschanged = _oldAdapter.onpairedstatuschanged;
+        }
+
+        _callbacks.forEach(function(callback) {
+          callback();
+        });
+        // clean up the _callback queue
+        _callbacks = [];
+      };
+
+      req.onerror = function() {
+        // We can do nothing without default adapter.
+        console.log('BluetoothHelper(): connot get default adapter!!!');
+      };
+    }
+  };
+
+  var _getAdapter = function() {
+    if (_v2) {
+      _fetchAdapterV2();
+    } else {
+      _fetchAdapter();
+    }
+  };
+
+  // init
   if (_bluetooth) {
-    _bluetooth.addEventListener('enabled', _getAdapter);
-    _bluetooth.addEventListener('adapteradded', _getAdapter);
+    // detect API version
+    if (typeof(_bluetooth.onattributechanged) === 'undefined') {
+      _v2 = false;
+    }
+
+    if (_v2) {
+      _bluetooth.onadapteradded = function onAdapterAdded(evt) {
+        _getAdapter();
+      };
+    } else {
+      _bluetooth.addEventListener('enabled', _getAdapter);
+      _bluetooth.addEventListener('adapteradded', _getAdapter);
+    }
     _getAdapter();
   }
 
@@ -88,6 +167,11 @@ var BluetoothHelper = function() {
     },
 
     getConnectedDevicesByProfile: function(profileID, cb) {
+      if (_v2) {
+        console.log('getConnectedDevicesByProfile API is deprecated');
+        return;
+      }
+
       _ready(function() {
         _handleRequest(_adapter.getConnectedDevices(profileID), cb);
       });
@@ -105,19 +189,47 @@ var BluetoothHelper = function() {
       });
     },
 
+    getPairedDevices: function(cb) {
+      _ready(function() {
+        _handleRequest(_adapter.getPairedDevices(), cb);
+      });
+    },
+
+    getAddress: function(cb) {
+      _ready(function() {
+        var address = _adapter.address;
+        cb(address);
+      });
+    },
+
     setPairingConfirmation: function(address, confirmed) {
+      if (_v2) {
+        console.log('setPairingConfirmation API is deprecated');
+        return;
+      }
+
       _ready(function() {
         _adapter.setPairingConfirmation(address, confirmed);
       });
     },
 
     setPinCode: function(address, pincode) {
+      if (_v2) {
+        console.log('setPairingConfirmation API is deprecated');
+        return;
+      }
+
       _ready(function() {
         _adapter.setPinCode(address, pincode);
       });
     },
 
     setPasskey: function(address, key) {
+      if (_v2) {
+        console.log('setPairingConfirmation API is deprecated');
+        return;
+      }
+
       _ready(function() {
         _adapter.setPasskey(address, key);
       });
@@ -133,6 +245,40 @@ var BluetoothHelper = function() {
       _ready(function() {
         _adapter.onscostatuschanged = callback;
       });
+    },
+
+    set onpairedstatuschanged(callback) {
+      if (_v2) {
+        console.log('onpairedstatuschanged API is deprecated');
+        return;
+      }
+
+      _ready(function() {
+        _adapter.onpairedstatuschanged = callback;
+      });
+    },
+
+    v2: _v2, // expose API version for app reference
+
+    // bypass the enable/disable state if works in APIv1
+    enable: function() {
+      if (_v2) {
+        _ready(function() {
+          _adapter.enable();
+        });
+      } else {
+        console.log('enable is not support in v1 API!');
+      }
+    },
+
+    disable: function() {
+      if (_v2) {
+        _ready(function() {
+          _adapter.disable();
+        });
+      } else {
+        console.log('disable is not support in v1 API!');
+      }
     }
   };
 };

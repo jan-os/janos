@@ -84,7 +84,6 @@ function copySettingsJStoProfile(stageDir, profileDir) {
 }
 
 function execute(options) {
-
   const WEBAPP_FILENAME = 'manifest.webapp';
   const UPDATE_WEBAPP_FILENAME = 'update.webapp';
   var webappsJSON = {};

@@ -5,7 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1">
 
-    <link rel="resource" type="application/l10n" href="/shared/locales/facebook.ini">
+    <meta name="defaultLanguage" content="en-US">
+    <meta name="availableLanguages" content="ar, en-US, fr, zh-TW">
+    <link rel="localization" href="/shared/locales/facebook/facebook.{locale}.properties">
     <script type="text/javascript" src="/shared/js/l10n.js"></script>
 
     <script type="text/javascript" src="/shared/js/async_storage.js"></script>
@@ -35,11 +37,14 @@
     <script defer type="text/javascript" src="/shared/js/contacts/import/contacts_importer.js"></script>
     <script defer type="text/javascript" src="/shared/js/contacts/import/importer_ui.js"></script>
     <script defer type="text/javascript" src="/shared/js/contacts/import/import_init.js"></script>
+    <script defer type="text/javascript" src="/shared/js/contacts/import/import_status_data.js"></script>
     <script defer type="text/javascript" src="/shared/js/contacts/import/utilities/misc.js"></script>
     <script defer type="text/javascript" src="/shared/js/component_utils.js"></script>
     <script defer type="text/javascript" src="/shared/elements/gaia_buttons/script.js"></script>
 
     <script defer type="text/javascript" src="/shared/js/contacts/import/friends_list.js"></script>
+
+    <script defer type="text/javascript" src="/shared/js/utilities.js"></script>
     <script defer type="text/javascript" src="/shared/js/contacts/search.js"></script>
 
     <!-- To include these files on the standard app
@@ -51,6 +56,9 @@
       <link href="/shared/js/contacts/import/gmail/gmail_connector.js">
       <link href="/shared/js/contacts/import/live/live_connector.js">
       <link href="/shared/js/contacts/import/facebook/facebook_connector.js">
+
+      <link href="/shared/js/contacts/import/utilities/config.js">
+      <link href="/shared/js/image_utils.js">
     -->
 
     <!--
@@ -77,6 +85,12 @@
     <link href="/shared/style/scrolling.css" rel="stylesheet">
     <link href="/shared/style/animations.css" rel="stylesheet">
 
+    <!-- Web Components -->
+    <!-- <link rel="stylesheet" type="text/css" href="/shared/elements/gaia-icons/gaia-icons.css" /> -->
+    <link rel="stylesheet" type="text/css" href="/shared/elements/gaia-theme/gaia-theme.css" />
+    <script defer src="/shared/elements/config.js"></script>
+    <script defer src="/shared/elements/gaia-header/dist/gaia-header.js"></script>
+
     <!--
     <link rel="stylesheet" href="/shared/pages/import/style/root.css">
     <link rel="stylesheet" href="/shared/pages/import/style/facebook.css">
@@ -85,20 +99,13 @@
     <link rel="stylesheet" href="/shared/pages/import/style/search.css">
   </head>
 
-  <body role="application" class="skin-comms">
+  <body role="application" class="theme-communications skin-comms">
     <section role="region" id="content" class="import">
 
-      <header>
-        <a href="#" id="import-close">
-          <span class="icon icon-close" data-l10n-id="close">close</span>
-        </a>
-        <menu type="toolbar">
-          <button  id="import-action" data-l10n-id="import" disabled>
-            Import
-          </button>
-        </menu>
+      <gaia-header id="header" action="close">
         <h1>Service</h1>
-      </header>
+        <button id="import-action" data-l10n-id="import" disabled>Import</button>
+      </gaia-header>
 
       <section id="main">
         <!-- Contacts List Section -->
@@ -128,8 +135,8 @@
                   <aside class="pack-end">
                     <span data-type="img" data-src="#contactPictureUri#"></span>
                   </aside>
-                  <p data-order-by="firstName"><strong>#givenName#</strong> #familyName#</p>
-                  <p data-order-by="lastName">#givenName# <strong>#familyName#</strong></p>
+                  <p data-order-by="firstName" class="contact-text"><strong>#givenName#</strong> #familyName#</p>
+                  <p data-order-by="lastName" class="contact-text">#givenName# <strong>#familyName#</strong></p>
                   <p>#email1#</p>
                 </li>
               </ol>
@@ -160,14 +167,14 @@
 
       <section id="search-view" class="view" role="region">
         <form id="searchview-container" role="search" class="search">
-           <button id='done-search' type="submit" data-l10n-id="done-search">Done</button>
-           <p>
-             <label for="search-contact">
-               <input type="search" name="search" class="textfield"
-                    placeholder="Search" id="search-contact"  data-l10n-id="search-contact">
-               <button type="reset">Clear</button>
-             </label>
-           </p>
+          <p>
+            <label for="search-contact">
+              <input type="search" name="search" class="textfield"
+                   placeholder="Search" id="search-contact"  data-l10n-id="search-contact">
+              <button type="reset">Clear</button>
+            </label>
+          </p>
+          <button id='done-search' type="submit" data-l10n-id="done-search">Done</button>
         </form>
         <section id="groups-list-search">
           <ol id="search-list" class="selecting active" data-type="list">

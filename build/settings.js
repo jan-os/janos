@@ -227,19 +227,11 @@ function execute(config) {
     settings['in-app-sheet.enabled'] = true;
   }
 
-  settings['debugger.remote-mode'] = config.REMOTE_DEBUGGER ? 'adb-only'
-                                                            : 'disabled';
-
   if (config.PRODUCTION === '1') {
     settings['feedback.url'] = 'https://input.mozilla.org/api/v1/feedback/';
-    settings['debugger.remote-mode'] = 'disabled';
   }
 
   settings['language.current'] = config.GAIA_DEFAULT_LOCALE;
-
-  if (config.DEVICE_DEBUG) {
-    settings['debugger.remote-mode'] = 'adb-devtools';
-  }
 
   if (config.NO_LOCK_SCREEN) {
     settings['screen.timeout'] = 0;
@@ -247,22 +239,13 @@ function execute(config) {
     settings['lockscreen.locked'] = false;
   }
 
-  // setDefaultKeyboardLayouts(config.GAIA_DEFAULT_LOCALE, settings, config);
+  settings['devtools.debugger.remote-enabled'] = true;
+  settings['debugger.remote-mode'] = 'adb-devtools';
 
   var queue = utils.Q.defer();
   queue.resolve();
 
   var result = queue.promise.then(function() {
-    setWallpaper(settings, config);
-  }).then(function() {
-    setMediatone(settings, config);
-  }).then(function() {
-    setAlarmtone(settings, config);
-  }).then(function() {
-    setRingtone(settings, config);
-  }).then(function() {
-    setNotification(settings, config);
-  }).then(function() {
     deviceTypeSettings(settings, config);
   }).then(function() {
     overrideSettings(settings, config);
@@ -272,6 +255,8 @@ function execute(config) {
   }).then(function() {
     writeSettings(settings, config);
     return settings;
+  }).catch(function(err) {
+    dump('Writing settings.js failed! ' + err + '\n');
   });
 
   // Ensure not quitting xpcshell before all asynchronous code is done
