@@ -1,10 +1,10 @@
-/* globals LazyLoader, SettingsListener, SimPicker */
+/* globals LazyLoader, SettingsListener */
 /* exported MultiSimActionButton */
 
 'use strict';
 
 // Keep this in sync with SimSettingsHelper.
-const ALWAYS_ASK_OPTION_VALUE = '-1';
+const ALWAYS_ASK_OPTION_VALUE = -1;
 
 var MultiSimActionButton = function MultiSimActionButton(
   button, callCallback, settingsKey, phoneNumberGetter) {
@@ -12,6 +12,7 @@ var MultiSimActionButton = function MultiSimActionButton(
   this._callCallback = callCallback;
   this._settingsKey = settingsKey;
   this._phoneNumberGetter = phoneNumberGetter;
+  this._simPicker = null;
 
   this._button.addEventListener('click', this._click.bind(this));
 
@@ -87,17 +88,23 @@ MultiSimActionButton.prototype._click = function(event) {
     return;
   }
 
-  if (cardIndex == ALWAYS_ASK_OPTION_VALUE) {
+  if (cardIndex === ALWAYS_ASK_OPTION_VALUE) {
     // The user has requested that we ask them every time for this key,
     // so we prompt them to pick a SIM even when they only click.
-    var self = this;
-    LazyLoader.load(['/shared/js/sim_picker.js'], function() {
-      SimPicker.getOrPick(cardIndex, phoneNumber,
-                          self.performAction.bind(self));
-    });
+    this._getOrPickSim(cardIndex, phoneNumber);
   } else {
     this.performAction(cardIndex);
   }
+};
+
+MultiSimActionButton.prototype._getOrPickSim =
+function(cardIndex, phoneNumber) {
+  var self = this;
+  LazyLoader.load(['/shared/elements/gaia_sim_picker/script.js'], function() {
+    self._simPicker = document.getElementById('sim-picker');
+    self._simPicker.getOrPick(cardIndex, phoneNumber,
+                              self.performAction.bind(self));
+  });
 };
 
 MultiSimActionButton.prototype._updateUI = function() {
@@ -108,7 +115,8 @@ MultiSimActionButton.prototype._updateUI = function() {
       navigator.mozIccManager.iccIds.length > 1) {
     if (this._simIndication) {
       var self = this;
-      var l10nId = this._simIndication.dataset.l10nId || 'sim-picker-button';
+      var l10nId = this._simIndication.dataset.l10nId ||
+                   'gaia-sim-picker-button';
       navigator.mozL10n.ready(function() {
         navigator.mozL10n.setAttributes(self._simIndication,
                                         l10nId,
@@ -147,11 +155,7 @@ MultiSimActionButton.prototype._contextmenu = function(event) {
     event.preventDefault();
   }
 
-  var self = this;
-  LazyLoader.load(['/shared/js/sim_picker.js'], function() {
-    SimPicker.getOrPick(self._getCardIndexIfLoaded(), phoneNumber,
-                        self.performAction.bind(self));
-  });
+  this._getOrPickSim(this._getCardIndexIfLoaded(), phoneNumber);
 };
 
 MultiSimActionButton.prototype.performAction = function(cardIndex) {

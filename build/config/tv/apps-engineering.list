@@ -1,8 +1,12 @@
-apps/system
-apps/settings
-apps/homescreen
+tv_apps/smart-system
+tv_apps/smart-settings
+tv_apps/smart-home
+tv_apps/browser
+tv_apps/app-deck
+tv_apps/dlna-player
+tv_apps/fling-player
+tv_apps/notification-receiver
 apps/bluetooth
-apps/browser
 apps/calendar
 apps/camera
 apps/clock
@@ -16,6 +20,7 @@ apps/pdfjs
 apps/video
 apps/wallpaper
 apps/marketplace.firefox.com
+apps/default_theme
 outoftree_apps/*
 dev_apps/test-agent
 dev_apps/homescreen-stingray

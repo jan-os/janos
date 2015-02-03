@@ -80,13 +80,14 @@ endif
 WGET_OPTS?=-c -nv
 GAIA_DOMAIN?=gaiamobile.org
 
-DEBUG?=0
-DEVICE_DEBUG?=0
 NO_LOCK_SCREEN?=0
 SCREEN_TIMEOUT?=-1
-PRODUCTION?=0
 GAIA_OPTIMIZE?=0
 GAIA_DEV_PIXELS_PER_PX?=1
+DEBUG?=0
+
+DEVICE_DEBUG=1
+PRODUCTION=0
 
 # Parallel build for multicores CPU
 P?=1
@@ -115,9 +116,9 @@ NOFTU?=0
 # Disable first time ping
 NOFTUPING?=0
 # Automatically enable remote debugger
-REMOTE_DEBUGGER?=0
+REMOTE_DEBUGGER?=1
 # Debug mode for build process
-BUILD_DEBUG?=0
+BUILD_DEBUG?=1
 
 ifeq ($(DEVICE_DEBUG),1)
 REMOTE_DEBUGGER=1
@@ -556,9 +557,11 @@ LANG=POSIX # Avoiding sort order differences between OSes
 
 .PHONY: app
 app: b2g_sdk profile-dir
+	@$(call run-js-command,app)
 
 .PHONY: pre-app
 pre-app: b2g_sdk profile-dir
+	@$(call run-js-command,pre-app)
 
 # Keep old targets just for people/scripts still using it
 .PHONY: post-manifest
@@ -581,8 +584,6 @@ endif
 
 profile-dir:
 	@test -d $(PROFILE_FOLDER) || mkdir -p $(PROFILE_FOLDER)
-	@test -d $(PROFILE_FOLDER)/defaults || mkdir -p $(PROFILE_FOLDER)/defaults
-	@touch $(PROFILE_FOLDER)/defaults/empty
 
 # Copy preload contacts to profile
 contacts: profile-dir
@@ -685,10 +686,8 @@ endif
 	@echo "Finished: Generating extensions"
 endif
 
-# some other stuff
 tools/pre-commit:
 	@echo 'Pre-commit'
-
 
 # this lists the programs we need in the Makefile and that are installed by npm
 
@@ -806,12 +805,12 @@ common-install:
 .PHONY: update-common
 update-common: common-install
 	# common testing tools
-	@echo 'Update common'
+	@echo 'update-common'
 
 # Create the json config file
 # for use with the test agent GUI
 test-agent-config:
-	@echo 'Test agent config'
+	@echo 'test-agent-config'
 
 # For test coverage report
 COVERAGE?=0

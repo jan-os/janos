@@ -12,7 +12,6 @@
  *    Also if you want to manage that yourself, remove the section.
  * 4. Add autogrant, because you cannot grant permissions w/o display
  */
-
 new Promise(res => {
   // Wait until the page is loaded
   document.readyState === 'complete' ? res() : window.onload = res;
@@ -55,6 +54,7 @@ new Promise(res => {
     req.onerror = rej;
   });
 }).then(() => {
+  console.log('Wrote settings successfully');
   // Fetching local_settings.json
   return new Promise((res, rej) => {
     var x = new XMLHttpRequest();
@@ -115,8 +115,31 @@ function startRadio(options) {
     roaming: false
   };
 
-  function unlockPinIfNeeded(icc) {
+  var needsPinButNoPinRequired = false;
+
+  window.unlockSim = function(pin, alsoRemoveSimLock) {
+    options.pin = pin;
+    needsPinButNoPinRequired = false;
+
+    var icc = navigator.mozIccManager.getIccById(
+      navigator.mozIccManager.iccIds[0]);
+
+    unlockPinIfNeeded(icc, function() {
+      var r2 = icc.setCardLock({ lockType: 'pin', pin: pin, enabled: false });
+      r2.onsuccess = function() {
+        console.log('removed pin');
+      };
+      r2.onerror = function(err) {
+        console.error('remove pin failed', err);
+      };
+    });
+  };
+
+  function unlockPinIfNeeded(icc, cb) {
     if (!icc) {
+      return;
+    }
+    if (needsPinButNoPinRequired) {
       return;
     }
     if (icc.cardState !== 'ready') {
@@ -124,9 +147,11 @@ function startRadio(options) {
     }
     if (icc.cardState === 'pinRequired') {
       if (!options.pin) {
-        console.warn('SIM needs PIN but no PIN supplied');
+        needsPinButNoPinRequired = true;
+        return console.warn('SIM needs PIN but no PIN supplied');
       }
       var req = icc.unlockCardLock({ lockType: 'pin', pin: options.pin });
+      req.onsuccess = cb;
       req.onerror = function(err) {
         console.error('Could not unlock SIM', err);
       };
@@ -142,6 +167,10 @@ function startRadio(options) {
 
       conn.onradiostatechange = function() {
         console.log('Radio state change', conn.radioState);
+
+        if (needsPinButNoPinRequired === true) {
+          return;
+        }
 
         if (conn.radioState === 'enabled') {
           // @todo multisim bug
@@ -298,7 +327,7 @@ function startWifi(options) {
   function enableWifi(network, password) {
     if (network) options.network = network;
     if (password) options.password = password;
-    
+
     options.enabled = true;
     navigator.mozSettings.createLock().set({ 'wifi.enabled': true });
   }
@@ -436,6 +465,10 @@ function startAutogrant() {
         remember: true
       });
       window.dispatchEvent(ev2);
+      break;
+
+    case 'remote-debugger-prompt':
+      dump('REMOTE DEBUGGER PROMPT!!!\n');
       break;
     }
   });

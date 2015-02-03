@@ -54,10 +54,47 @@ function getImageSize(blob, callback, error) {
         error(e.toString());
       }
     }
+    else if (magic.substring(0, 2) === 'BM' &&
+             data.getUint32(2, true) === blob.size)
+    {
+      // This is a BMP file
+      try {
+        var width, height;
+
+        if (data.getUint16(14, true) === 12) { // check format version
+          width = data.getUint16(18, true);  // 16-bit little endian width
+          height = data.getUint16(20, true); // 16-bit little endian height
+        }
+        else { // newer versions of the format use 32-bit ints
+          width = data.getUint32(18, true);  // 32-bit little endian width
+          height = data.getUint32(22, true); // 32-bit little endian height
+        }
+
+        callback({
+          type: 'bmp',
+          width: width,
+          height: height
+        });
+      }
+      catch (e) {
+        error(e.toString());
+      }
+    }
     else if (magic.substring(0, 2) === '\xFF\xD8') {
       parseJPEGMetadata(blob,
                         function(metadata) {
-                          metadata.type = 'jpeg';
+                          if (metadata.progressive) {
+                            // If the jpeg parser tells us that this is
+                            // a progressive jpeg, then treat that as a
+                            // distinct image type because pjpegs have
+                            // such different memory requirements than
+                            // regular jpegs.
+                            delete metadata.progressive;
+                            metadata.type = 'pjpeg';
+                          }
+                          else {
+                            metadata.type = 'jpeg';
+                          }
                           callback(metadata);
                         },
                         error);

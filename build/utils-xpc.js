@@ -4,7 +4,6 @@
 /* jshint -W079, -W118 */
 
 const { Cc, Ci, Cr, Cu, CC } = require('chrome');
-const { btoa } = Cu.import('resource://gre/modules/Services.jsm', {});
 
 Cu.import('resource://gre/modules/XPCOMUtils.jsm');
 Cu.import('resource://gre/modules/FileUtils.jsm');
@@ -15,16 +14,21 @@ Cu.import('resource://gre/modules/reflect.jsm');
 
 var utils = require('./utils.js');
 var subprocess = require('sdk/system/child_process/subprocess');
+
+const UUID_FILENAME = 'uuid.json';
+
 /**
  * Returns an array of nsIFile's for a given directory
  *
  * @param  {nsIFile} dir       directory to read.
  * @param  {boolean} recursive set to true in order to walk recursively.
- * @param  {RegExp}  exclude   optional filter to exclude file/directories.
+ * @param  {RegExp}  filter    optional filter for file names.
+ * @param  {boolean} include   set to true in order to include file matched by
+ *                             filter, set to false to exclude.
  *
- * @returns {Array}   list of nsIFile's.
+ * @returns {Array}            list of nsIFile's.
  */
-function ls(dir, recursive, exclude) {
+function ls(dir, recursive, pattern, include) {
   let results = [];
   if (!dir.exists()) {
     return results;
@@ -33,10 +37,15 @@ function ls(dir, recursive, exclude) {
   let files = dir.directoryEntries;
   while (files.hasMoreElements()) {
     let file = files.getNext().QueryInterface(Ci.nsILocalFile);
-    if (!exclude || !exclude.test(file.leafName)) {
+    //  include |  pattern.test()  |  result
+    //    true  |     false        |   false
+    //    true  |     true         |   true
+    //    false |     false        |   true
+    //    false |     true         |   false
+    if (!pattern || !(include ^ pattern.test(file.leafName))) {
       results.push(file);
       if (recursive && file.isDirectory()) {
-        results = results.concat(ls(file, true, exclude));
+        results = results.concat(ls(file, true, pattern, include));
       }
     }
   }
@@ -119,7 +128,9 @@ function writeContent(file, content) {
     converterStream.writeString(content);
     converterStream.close();
   } catch (e) {
-    dump('writeContent error, file.path: ' + file.path + '\n');
+    utils.log('utils-xpc', 'writeContent error, file.path: ' + file.path);
+    utils.log('utils-xpc', 'parent file object exists: ' +
+      file.parent.exists());
     throw(e);
   }
 }
@@ -138,7 +149,9 @@ function writeContent(file, content) {
  */
 function getFile() {
   try {
-    let file = new FileUtils.File(arguments[0]);
+    let first = utils.getOsType().indexOf('WIN') === -1 ?
+      arguments[0] : arguments[0].replace(/\//g, '\\');
+    let file = new FileUtils.File(first);
     if (arguments.length > 1) {
       let args = Array.prototype.slice.call(arguments, 1);
       args.forEach(function(dir) {
@@ -276,6 +289,28 @@ function readZipManifest(appDir) {
                   ' app (' + appDir.leafName + ')\n');
 }
 
+let UUID_MAPPING;
+
+function getUUIDMapping(config) {
+  if (UUID_MAPPING) {
+    return UUID_MAPPING;
+  }
+  UUID_MAPPING = {};
+  // Try to retrieve it from $GAIA_DISTRIBUTION_DIR/uuid.json if exists.
+  try {
+    var uuidFile = getFile(config.GAIA_DISTRIBUTION_DIR, UUID_FILENAME);
+    if (uuidFile.exists()) {
+      utils.log('webapp-manifests',
+        'uuid.json in GAIA_DISTRIBUTION_DIR found.');
+      UUID_MAPPING = JSON.parse(getFileContent(uuidFile));
+    }
+  } catch (e) {
+    // ignore exception if GAIA_DISTRIBUTION_DIR does not exist.
+  }
+  return UUID_MAPPING;
+}
+exports.getUUIDMapping = getUUIDMapping;
+
 /**
  * Get an app's detail in an object. For example:
  * {
@@ -286,13 +321,10 @@ function readZipManifest(appDir) {
  * }
  *
  * @param app {string} - the app name
- * @param domain {string} - the domain name, like 'gaiamobile.org'
- * @param scheme {string} - 'http://' or 'app://'
- * @param port {string} - '8080' or keep null
- * @param stageDir {string} - the path of the build stage directory
+ * @param config {object} - the config object, with all env variables
  * @return {obeject} - the information of the webapp
  */
-function getWebapp(app, domain, scheme, port, stageDir) {
+function getWebapp(app, config) {
   let appDir = getFile(app);
   if (!appDir.exists()) {
     throw new Error(' -*- build/utils.js: file not found (' +
@@ -314,19 +346,18 @@ function getWebapp(app, domain, scheme, port, stageDir) {
   let manifestJSON = getJSON(manifest);
 
   // Use the folder name as the the domain name
-  let appDomain = appDir.leafName + '.' + domain;
+  let appDomain = appDir.leafName + '.' + config.GAIA_DOMAIN;
   if (manifestJSON.origin) {
     appDomain = utils.getNewURI(manifestJSON.origin).host;
   }
 
   let webapp = {
+    appDir: appDir,
     manifest: manifestJSON,
     manifestFile: manifest,
-    buildManifestFile: manifest,
-    url: scheme + appDomain,
+    url: config.GAIA_SCHEME + appDomain,
     domain: appDomain,
     sourceDirectoryFile: manifestFile.parent,
-    buildDirectoryFile: manifestFile.parent,
     sourceDirectoryName: appDir.leafName,
     sourceAppDirectoryName: appDir.parent.leafName
   };
@@ -343,10 +374,40 @@ function getWebapp(app, domain, scheme, port, stageDir) {
   }
 
   // Some webapps control their own build
-  webapp.buildDirectoryFile = utils.getFile(stageDir,
+  webapp.buildDirectoryFile = utils.getFile(config.STAGE_DIR,
     webapp.sourceDirectoryName);
   webapp.buildManifestFile = utils.getFile(webapp.buildDirectoryFile.path,
     'manifest.webapp');
+
+  // Generate the webapp folder name in the profile. Only if it's privileged
+  // and it has an origin in its manifest file it'll be able to specify a custom
+  // folder name. Otherwise, generate an UUID to use as folder name.
+  var webappTargetDirName;
+  if (isExternalApp(webapp)) {
+    var type = webapp.appStatus;
+    var isPackaged = false;
+    if (webapp.pckManifest) {
+      isPackaged = true;
+      if (webapp.metaData.origin) {
+        throw new Error('External webapp `' + webapp.sourceDirectoryName +
+                        '` can not have origin in metadata because is ' +
+                        'packaged');
+      }
+    }
+    if (type === 2 && isPackaged && webapp.pckManifest.origin) {
+      webappTargetDirName = utils.getNewURI(webapp.pckManifest.origin).host;
+    } else {
+      // uuid is used for webapp directory name, save it for further usage
+      let mapping = getUUIDMapping(config);
+      var uuid = mapping[webapp.sourceDirectoryName] ||
+                 generateUUID().toString();
+      mapping[webapp.sourceDirectoryName] = webappTargetDirName = uuid;
+    }
+  } else {
+    webappTargetDirName = webapp.domain;
+  }
+  webapp.profileDirectoryFile = utils.getFile(config.PROFILE_DIR, 'webapps',
+                                              webappTargetDirName);
 
   return webapp;
 }
@@ -355,16 +416,13 @@ function getWebapp(app, domain, scheme, port, stageDir) {
  * Get the collection of the information of webapps.
  *
  * @param appdirs {[string]} - the list of all app names
- * @param domain {string} - the domain name, like 'gaiamobile.org'
- * @param scheme {string} - 'http://' or 'app://'
- * @param port {string} - '8080' or keep null
- * @param stageDir {string} - the path of the build stage directory
+ * @param config {object} - the config object, with all env variables
  * @return {[obeject]} - the list of information of the webapps
  */
-function makeWebappsObject(appdirs, domain, scheme, port, stageDir) {
+function makeWebappsObject(appdirs, config) {
   var apps = [];
   appdirs.forEach(function(app) {
-    var webapp = getWebapp(app, domain, scheme, port, stageDir);
+    var webapp = getWebapp(app, config);
     if (webapp) {
       apps.push(webapp);
     }
@@ -384,18 +442,20 @@ function makeWebappsObject(appdirs, domain, scheme, port, stageDir) {
  */
 var gaia = {
   config: {},
+  aggregatePrefix: 'gaia_build_',
   getInstance: function(config) {
     if (JSON.stringify(this.config) !== JSON.stringify(config) ||
       !this.instance) {
+      config.rebuildAppDirs = config.rebuildAppDirs || [];
       this.config = config;
       this.instance = {
         stageDir: getFile(this.config.STAGE_DIR),
         engine: this.config.GAIA_ENGINE,
         sharedFolder: getFile(this.config.GAIA_DIR, 'shared'),
         webapps: makeWebappsObject(this.config.GAIA_APPDIRS.split(' '),
-          this.config.GAIA_DOMAIN, this.config.GAIA_SCHEME,
-          this.config.GAIA_PORT, this.config.STAGE_DIR),
-        aggregatePrefix: 'gaia_build_',
+                                   this.config),
+        rebuildWebapps: makeWebappsObject(this.config.rebuildAppDirs,
+                                          this.config),
         distributionDir: this.config.GAIA_DISTRIBUTION_DIR
       };
     }
@@ -612,6 +672,11 @@ function copyDirTo(path, toParent, name, override) {
       copyDirTo(file.path, newFolderName, file.leafName, true);
     }
   });
+}
+
+function copyToStage(options) {
+  var appDir = getFile(options.APP_DIR);
+  copyDirTo(appDir, options.STAGE_DIR, appDir.leafName);
 }
 
 /**
@@ -976,6 +1041,12 @@ function getEnv(name) {
   return env.get(name);
 }
 
+function setEnv(name, value) {
+  var env = Cc['@mozilla.org/process/environment;1'].
+            getService(Ci.nsIEnvironment);
+  env.set(name, value);
+}
+
 /**
  * Get PATH of the environment
  * @return {[string]}
@@ -996,17 +1067,23 @@ function getEnvPath() {
   return paths;
 }
 
+/**
+ * Get an new process instance
+ * @return {nsIProcess}
+ */
+function getProcess() {
+  return Cc['@mozilla.org/process/util;1'].createInstance(Ci.nsIProcess);
+}
 
 /**
- * get pid from device via adb
- * @param  {string} appName - the app name
- * @param  {string} gaiaDir - the absolute path to Gaia directory
- * @return {number}         - process id
+ * Kill one running app by PID.
+ * @param appName {string} - the app name
+ * @param gaiaDir {string} - the absolute path to Gaia directory
  */
-function getPid(appName, gaiaDir) {
+function killAppByPid(appName, gaiaDir) {
+
   var sh = new Commander('sh');
   sh.initPath(getEnvPath(), function() {});
-
   var tempFileName = 'tmpFile';
   var tmpFileSrc = joinPath(gaiaDir, tempFileName);
   sh.run(['-c', 'touch ' + tempFileName]);
@@ -1015,25 +1092,11 @@ function getPid(appName, gaiaDir) {
   var content = getFileContent(tempFile);
   var pidMap = utils.psParser(content);
   sh.run(['-c', 'rm ' + tempFileName]);
-
   // b2g-ps only show first 15 letters of app name
   var truncatedAppName = appName.substr(0, 15);
   if (pidMap[truncatedAppName] && pidMap[truncatedAppName].PID) {
-    return pidMap[truncatedAppName].PID;
-  } else {
-    return -1;
+    sh.run(['-c', 'adb shell kill ' + pidMap[truncatedAppName].PID]);
   }
-}
-
-
-/**
- * Kill one running app by PID.
- * @param pid {number} - process id to kill in device
- */
-function killAppByPid(pid) {
-  var sh = new Commander('sh');
-  sh.initPath(getEnvPath(), function() {});
-  sh.run(['-c', 'adb shell kill ' + pid]);
 }
 
 /**
@@ -1171,7 +1234,19 @@ function removeFiles(dir, filenames) {
   filenames.forEach(function(fn) {
     var file = getFile(dir.path, fn);
     if (file.exists()) {
-      file.remove(file.isDirectory());
+      try {
+        file.remove(file.isDirectory());
+      } catch (e) {
+        utils.log('utils-xpc', (file.isDirectory() ? 'directory' : 'file')  +
+          ' cannot be removed: ' + file.path);
+        if (file.isDirectory()) {
+          utils.log('utils-xpc', 'files in ' + file.leafName + ' directory:');
+          utils.ls(file, true).forEach(function(f) {
+            dump('* ' + f.path + '\n');
+          });
+        }
+        throw e;
+      }
     }
   });
 }
@@ -1183,16 +1258,21 @@ function removeFiles(dir, filenames) {
  */
 var scriptLoader = {
   scripts: {},
-  load: function(path, exportObj) {
+  load: function(filePath, exportObj, withoutCache) {
     try {
-      if (this.scripts[path]) {
+      if (!withoutCache && this.scripts[filePath]) {
         return;
       }
-      Services.scriptloader.loadSubScript(path, exportObj);
-      this.scripts[path] = true;
+      var uri = Services.io.newFileURI(getFile(filePath)).spec;
+      if (withoutCache) {
+        uri += '?d=' + new Date().getTime();
+      }
+      Services.scriptloader.loadSubScript(uri, exportObj, 'UTF-8');
+      this.scripts[filePath] = true;
     } catch(e) {
-      delete this.scripts[path];
-      throw 'cannot load script from ' + path;
+      delete this.scripts[filePath];
+      throw 'Utils.scriptLoader: Cannot load script from ' + filePath +
+            ': ' + e.toString();
     }
   }
 };
@@ -1205,7 +1285,6 @@ exports.getFile = getFile;
 exports.ensureFolderExists = ensureFolderExists;
 exports.getJSON = getJSON;
 exports.getFileAsDataURI = getFileAsDataURI;
-exports.makeWebappsObject = makeWebappsObject;
 exports.getDistributionFileContent = getDistributionFileContent;
 exports.resolve = resolve;
 exports.getBuildConfig = getBuildConfig;
@@ -1223,7 +1302,6 @@ exports.getOsType = getOsType;
 exports.generateUUID = generateUUID;
 exports.copyRec = copyRec;
 exports.createZip = createZip;
-exports.scriptLoader = scriptLoader;
 exports.scriptParser = Reflect.parse;
 // ===== the following functions support node.js compitable interface.
 exports.deleteFile = deleteFile;
@@ -1233,6 +1311,7 @@ exports.mkdirs = mkdirs;
 exports.joinPath = joinPath;
 exports.copyFileTo = copyFileTo;
 exports.copyDirTo = copyDirTo;
+exports.copyToStage = copyToStage;
 exports.createXMLHttpRequest = createXMLHttpRequest;
 exports.downloadJSON = downloadJSON;
 exports.readJSONFromPath = readJSONFromPath;
@@ -1241,8 +1320,9 @@ exports.processEvents = processEvents;
 exports.readZipManifest = readZipManifest;
 exports.log = log;
 exports.killAppByPid = killAppByPid;
-exports.getPid = getPid;
 exports.getEnv = getEnv;
+exports.setEnv = setEnv;
+exports.getProcess = getProcess;
 exports.isExternalApp = isExternalApp;
 exports.getDocument = getDocument;
 exports.getWebapp = getWebapp;
@@ -1255,3 +1335,4 @@ exports.addEntryContentWithTime = addEntryContentWithTime;
 exports.getCompression = getCompression;
 exports.existsInAppDirs = existsInAppDirs;
 exports.removeFiles = removeFiles;
+exports.scriptLoader = scriptLoader;
