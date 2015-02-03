@@ -25,6 +25,9 @@ new Promise(res => {
   // Listen for wakelock events
   window.cpuManager = new CpuManager();
   window.cpuManager.start();
+
+  // Disable cpuSleepAllowed, need to be explicitely run by user
+  navigator.mozPower.cpuSleepAllowed = false;
 }).then(() => {
   // Turn the screen on
 
