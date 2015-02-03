@@ -1,0 +1,24 @@
+{
+  "wifi": {
+    "enabled": true,
+    "network": "H368N66CCBC",
+    "password": "93FA2273AD79"
+  },
+  "cellular": {
+    "roaming": false,
+    "edgeOnly": false,
+    "pin": "0000"
+  },
+  "bluetooth": {
+    "audioAddress": "Bl:ue:to:ot"
+  },
+  "tracker": {
+    "serverUrl": "see https://github.com/janjongboom/janos-tracker-server, put no trailing slash at the end",
+    "deviceId": "",
+    "fallbackCoords": {
+      "latitude": 59.900447,
+      "longitude": 10.630135,
+      "accuracy": 50
+    }
+  }
+}

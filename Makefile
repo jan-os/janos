@@ -115,7 +115,7 @@ NOFTU?=0
 # Disable first time ping
 NOFTUPING?=0
 # Automatically enable remote debugger
-REMOTE_DEBUGGER?=0
+REMOTE_DEBUGGER?=1
 # Debug mode for build process
 BUILD_DEBUG?=0
 
