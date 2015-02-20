@@ -113,6 +113,10 @@ new Promise(res => {
  * Radio
  */
 function startRadio(options) {
+  if (!('mozIccManager' in navigator)) {
+    return console.warn('No ICC Manager, disabling radio');
+  }
+  
   options = options || {
     edgeOnly: false,
     roaming: false
