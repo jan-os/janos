@@ -10,3 +10,15 @@ pre {
   padding: 3vw;
   font-size: calc(100vw / 30);
 }
+.blink {
+  width: 20vw;
+  height: 10vh;
+}
+#speed {
+  height: 10vh;
+  vertical-align: bottom;
+}
+label[for=speed] {
+  font-size: 2rem;
+  padding-left: 1rem;
+}
