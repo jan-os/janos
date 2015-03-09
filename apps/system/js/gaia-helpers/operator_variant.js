@@ -17,7 +17,7 @@
   // This json file should always be accessed from the root instead of the
   // current working base URL so that it can work in unit-tests as well
   // as during normal run time.
-  var OPERATOR_VARIANT_FILE = '/js/apn.json';
+  var OPERATOR_VARIANT_FILE = '/js/gaia-helpers/apn.json';
 
   var APN_TYPES = ['default', 'mms', 'supl', 'dun', 'ims'];
   var AUTH_TYPES = ['none', 'pap', 'chap', 'papOrChap'];
@@ -554,7 +554,7 @@
      * @return {Array} The data call settings.
      */
     buildApnSettings: function ovh_buildApnSettings(allApnList) {
-      window.log.info('apn list', allApnList);
+      console.log('apn list', allApnList);
 
       var tmpApnSettings = [];
       var apnSettings = [];
@@ -616,7 +616,7 @@
 
         result[this._iccCardIndex] = mergedApnSettings;
 
-        window.log.info('Setting APN settings to', result);
+        console.log('Setting APN settings to', result);
 
         transaction.set({
           'ril.data.apnSettings': result,
