@@ -17,7 +17,7 @@
   // This json file should always be accessed from the root instead of the
   // current working base URL so that it can work in unit-tests as well
   // as during normal run time.
-  var OPERATOR_VARIANT_FILE = '/js/gaia-helpers/apn.json';
+  var OPERATOR_VARIANT_FILE = '/js/apn.json';
 
   var APN_TYPES = ['default', 'mms', 'supl', 'dun', 'ims'];
   var AUTH_TYPES = ['none', 'pap', 'chap', 'papOrChap'];
@@ -239,9 +239,9 @@
       var listMvnoType = apn.mvno_type || '';
       var listMvnoMatchData = apn.mvno_match_data || '';
 
-      if (mvnoType &&
-         (mvnoType === listMvnoType) &&
-         (mvnoMatchData === listMvnoMatchData)) {
+      if (!listMvnoType ||
+          (mvnoType && mvnoType === listMvnoType &&
+           mvnoMatchData === listMvnoMatchData)) {
           filteredApnList.push(apn);
           return this.filterApnsByMvnoRules(apnIndex + 1,
                                             allApnList,
@@ -251,7 +251,7 @@
                                             onFinish);
       }
 
-      var iccCard = window.iccManager.getIccById(this._iccId);
+      var iccCard = navigator.mozIccManager.getIccById(this._iccId);
       var request = iccCard.matchMvno(listMvnoType, listMvnoMatchData);
       request.onsuccess = (function onSuccessHandler() {
         var match = request.result;
@@ -265,9 +265,7 @@
                                             listMvnoMatchData,
                                             onFinish);
         }
-        if (!listMvnoType) {
-          filteredApnList.push(apn);
-        }
+
         this.filterApnsByMvnoRules(apnIndex + 1,
                                    allApnList,
                                    filteredApnList,
@@ -276,9 +274,6 @@
                                    onFinish);
       }).bind(this);
       request.onerror = (function onErrorHandler() {
-        if (!listMvnoType) {
-          filteredApnList.push(apn);
-        }
         this.filterApnsByMvnoRules(apnIndex + 1,
                                    allApnList,
                                    filteredApnList,
@@ -559,6 +554,8 @@
      * @return {Array} The data call settings.
      */
     buildApnSettings: function ovh_buildApnSettings(allApnList) {
+      window.log.info('apn list', allApnList);
+
       var tmpApnSettings = [];
       var apnSettings = [];
       var validApnFound = false;
@@ -618,6 +615,9 @@
           existingApnSettings, apnSettings);
 
         result[this._iccCardIndex] = mergedApnSettings;
+
+        window.log.info('Setting APN settings to', result);
+
         transaction.set({
           'ril.data.apnSettings': result,
           'apn.selections': null
