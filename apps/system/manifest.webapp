@@ -47,7 +47,9 @@
     "systemXHR":{},
     "feature-detection": {},
     "push": { "description": "To track you!" },
-    "sms":{}
+    "sms": {},
+    "tcp-socket": {},
+    "before-after-keyboard-event": {}
   },
   "locales": {
     "ar": {
